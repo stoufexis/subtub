@@ -1,19 +1,15 @@
 package com.stoufexis.subtub
 
 import cats.*
-import cats.data.*
 import cats.effect.*
-import cats.effect.kernel.Unique.Token
 import cats.effect.std.*
 import cats.implicits.given
 import fs2.*
-import fs2.concurrent.*
 
 import com.stoufexis.subtub.data.*
 import com.stoufexis.subtub.model.*
 
 import scala.collection.Set
-import scala.collection.concurrent.TrieMap
 
 trait SubTub[F[_]]:
   def publish1(key: StreamId, message: Message): F[Unit]
@@ -80,11 +76,12 @@ object SubTub:
         yield (t, q)
 
       def subscribe(keys: Set[StreamId], maxQueued: Int): Stream[F, (StreamId, Message)] =
-        Stream.eval(newSubscriber(maxQueued)).flatMap: sub =>
-          Stream
-            .eval(topics.subscribeToAll(keys, sub))
-            .flatMap(_ => Stream.fromQueueUnterminated(sub._2))
-            .onFinalize(topics.unsubscribeFromAll(keys, sub._1))
+        Stream.eval(newSubscriber(maxQueued)).flatMap:
+          case sub @ (token, queue) =>
+            Stream
+              .eval(topics.subscribeToAll(keys, sub))
+              .flatMap(_ => Stream.fromQueueUnterminated(queue))
+              .onFinalize(topics.unsubscribeFromAll(keys, token))
 
       def subscribe(key: StreamId, maxQueued: Int): Stream[F, (StreamId, Message)] =
         subscribe(Set(key), maxQueued)

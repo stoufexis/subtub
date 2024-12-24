@@ -10,8 +10,8 @@ trait SignallingPrefixMapRef[F[_], P, K, V]:
   def apply(p: P): SignallingRef[F, PositionedPrefixMap[K, V]]
 
 object SignallingPrefixMapRef:
-  def apply[F[_], P: Prefix: ShardKey, K, V](shardCount: Int)(using
-    F: Concurrent[F]
+  def apply[F[_]: Concurrent, P: Prefix: ShardKey, K, V](
+    shardCount: Int
   ): F[SignallingPrefixMapRef[F, P, K, V]] =
     val prefixMaps: F[List[SignallingRef[F, PrefixMap[P, K, V]]]] =
       List

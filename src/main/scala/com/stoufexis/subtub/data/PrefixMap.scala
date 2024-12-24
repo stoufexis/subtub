@@ -38,7 +38,7 @@ case class PrefixMap[P: Prefix, K, V](
           case Some(pm) =>
             Some(pm.replaceNodeAt(p.prefixTail, replacement)).filterNot(_.isEmpty)
           case None =>
-            Option.when(replacement.nonEmpty)(PrefixMap.empty.replaceNodeAt(p.prefixTail, replacement))
+            Option.when(replacement.nonEmpty)(empty.replaceNodeAt(p.prefixTail, replacement))
 
   def removeAt(p: P, key: K): PrefixMap[P, K, V] =
     p.prefixHead match
@@ -53,11 +53,11 @@ case class PrefixMap[P: Prefix, K, V](
 
   def updateAt(p: P, key: K, value: V): PrefixMap[P, K, V] =
     p.prefixHead match
-      case None => updateAt(p, key, value)
+      case None => updateAt(key, value)
       case Some(c) =>
         updatedSubtree(c):
           case Some(pm) => Some(pm.updateAt(p.prefixTail, key, value))
-          case None     => Some(PrefixMap.empty.updateAt(p.prefixTail, key, value))
+          case None     => Some(empty.updateAt(p.prefixTail, key, value))
 
   def updateAt(key: K, value: V): PrefixMap[P, K, V] =
     PrefixMap(node.updated(key, value), subtree)
@@ -70,6 +70,29 @@ case class PrefixMap[P: Prefix, K, V](
   def getMatching: List[V] =
     node.values.toList ++ subtree.values.flatMap(_.getMatching).toList
 
+  def print(root: Char, printNode: Map[K, V] => String): List[String] =
+    val lines: List[String] =
+      for
+        (char, prefixMap) <- subtree.toList
+        subtreeLine <- prefixMap.print(char, printNode)
+      yield subtreeLine
+
+    (if lines.isEmpty then List("") else lines.map("--" + _)).map: l =>
+      s"$root(${printNode(node)})" + l
+
+
 object PrefixMap:
   def empty[P: Prefix, K, V]: PrefixMap[P, K, V] =
     PrefixMap(Map.empty, Map.empty)
+
+object Main extends App:
+  val pm = PrefixMap.empty[String, Int, String]
+
+  pm.updateAt("abc", 1, "A")
+    .updateAt("abcd", 2, "B")
+    .updateAt("ab", 3, "C")
+    .updateAt("abc", 4, "D")
+    .updateAt("abd", 5, "E")
+    .updateAt("abefg", 6, "F")
+    .print('*', _.toList.map((k,v)=>s"${k}->${v}").mkString(","))
+    .foreach(println)

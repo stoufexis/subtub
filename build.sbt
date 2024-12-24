@@ -36,6 +36,7 @@ lazy val effect: Seq[ModuleID] =
 lazy val root = (project in file("."))
   .settings(
     name := "subtub",
+    scalacOptions ++= compileFlags,
     libraryDependencies ++= http ++ effect,
     libraryDependencies += munit % Test
   )

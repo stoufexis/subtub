@@ -13,3 +13,11 @@ extension [A: Prefix](a: A)
   def prefixTail: A = summon[Prefix[A]].prefixTail(a)
 
   def prefix: String = summon[Prefix[A]].prefix(a)
+
+object Prefix:
+  given Prefix[String] with
+    def prefix(a: String): String = a
+
+    def prefixHead(a: String): Option[Char] = a.headOption
+
+    def prefixTail(a: String): String = a.drop(1)
