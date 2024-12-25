@@ -11,6 +11,8 @@ trait PositionedPrefixMap[K, V]:
 
   def getMatching: List[V]
 
+  def allNodes: List[Map[K, V]]
+
 object PositionedPrefixMap:
   def apply[P, K, V](pm: PrefixMap[P, K, V]): PositionedPrefixMap[K, V] = new:
     def node: Map[K, V] = pm.node
@@ -22,3 +24,5 @@ object PositionedPrefixMap:
     def updateAt(key: K, value: V): PositionedPrefixMap[K, V] = apply(pm.updateAt(key, value))
 
     def getMatching: List[V] = pm.getMatching
+
+    def allNodes: List[Map[K, V]] = pm.allNodes

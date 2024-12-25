@@ -80,19 +80,9 @@ case class PrefixMap[P: Prefix, K, V](
     (if lines.isEmpty then List("") else lines.map("--" + _)).map: l =>
       s"$root(${printNode(node)})" + l
 
+  def allNodes: List[Map[K, V]] =
+    node :: subtree.toList.flatMap((_, p) => p.allNodes)
 
 object PrefixMap:
   def empty[P: Prefix, K, V]: PrefixMap[P, K, V] =
     PrefixMap(Map.empty, Map.empty)
-
-object Main extends App:
-  val pm = PrefixMap.empty[String, Int, String]
-
-  pm.updateAt("abc", 1, "A")
-    .updateAt("abcd", 2, "B")
-    .updateAt("ab", 3, "C")
-    .updateAt("abc", 4, "D")
-    .updateAt("abd", 5, "E")
-    .updateAt("abefg", 6, "F")
-    .print('*', _.toList.map((k,v)=>s"${k}->${v}").mkString(","))
-    .foreach(println)

@@ -10,6 +10,7 @@ import com.stoufexis.subtub.data.*
 import com.stoufexis.subtub.model.*
 
 import scala.collection.Set
+import org.typelevel.log4cats.Logger
 
 trait SubTub[F[_]]:
   def publish1(key: StreamId, message: Message): F[Unit]
@@ -21,22 +22,26 @@ trait SubTub[F[_]]:
   def subscribe(keys: Set[StreamId], maxQueued: Int): Stream[F, (StreamId, Message)]
 
 object SubTub:
-  def apply[F[_]](shardCount: Int)(using F: Concurrent[F], T: Unique[F]): F[SubTub[F]] =
+  def apply[F[_]](shardCount: Int)(using F: Concurrent[F], T: Unique[F], log: Logger[F]): F[SubTub[F]] =
 
     type Subscriber = Queue[F, (StreamId, Message)]
 
     extension (pm: SignallingPrefixMapRef[F, StreamId, Unique.Token, Subscriber])
       def subscribeToAll(keys: Set[StreamId], sub: (Unique.Token, Subscriber)): F[Unit] =
-        keys.toList.traverse_(sid => pm(sid).update(_.updateAt(sub._1, sub._2)))
+        keys.toList.traverse_ : sid => 
+          log.info(s"new subscription to ${sid.string}") >>
+          pm.get(sid).update(_.updateAt(sub._1, sub._2))
 
       def unsubscribeFromAll(keys: Set[StreamId], token: Unique.Token): F[Unit] =
-        keys.toList.traverse_(sid => pm(sid).update(_.removeAt(token)))
+        keys.toList.traverse_ : sid =>
+          log.info(s"remove subscription from ${sid.string}") >>
+          pm.get(sid).update(_.removeAt(token))
 
     for
       topics <- SignallingPrefixMapRef[F, StreamId, Unique.Token, Subscriber](shardCount)
     yield new:
       def publish1(key: StreamId, message: Message): F[Unit] =
-        topics(key).get.flatMap(_.getMatching.traverse_(_.offer((key, message))))
+        topics.get(key).get.flatMap(_.getMatching.traverse_(_.offer((key, message))))
 
       def publish(key: StreamId): Pipe[F, Message, Nothing] =
         def loop(
@@ -55,7 +60,7 @@ object SubTub:
               loop(tail, state.getMatching)
 
         def publishLoop(messages: Stream[F, Message]): Pull[F, Nothing, Unit] =
-          topics(key).discrete.pull.uncons1.flatMap:
+          topics.get(key).discrete.pull.uncons1.flatMap:
             case None =>
               Pull.done
 

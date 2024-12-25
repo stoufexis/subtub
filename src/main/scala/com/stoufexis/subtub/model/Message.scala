@@ -1,3 +1,5 @@
 package com.stoufexis.subtub.model
 
-case class Message(payload: Bytes)
+import io.circe.Codec
+
+case class Message(payload: String) derives Codec
