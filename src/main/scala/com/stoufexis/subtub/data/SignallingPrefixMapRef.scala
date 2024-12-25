@@ -6,6 +6,7 @@ import fs2.concurrent.SignallingRef
 
 import com.stoufexis.subtub.typeclass.*
 import cats.kernel.*
+import cats.kernel.Monoid
 
 trait SignallingPrefixMapRef[F[_], P, K, V]:
   def get(p: P): SignallingRef[F, PositionedPrefixMap[K, V]]
@@ -38,5 +39,5 @@ object SignallingPrefixMapRef:
         def get(p: P): SignallingRef[F, PositionedPrefixMap[K, V]] =
           SignallingRef.lens(refFunction(p))(positioned(p), recombine(p))
 
-        def collectFromAll[A](f: PrefixMap[P, K, V] => A)(using mon: Monoid[A]): F[A] =
+        def collectFromAll[A: Monoid](f: PrefixMap[P, K, V] => A): F[A] =
           list.traverse(_.get.map(f)).map(_.combineAll)
