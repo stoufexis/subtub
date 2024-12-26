@@ -27,7 +27,7 @@ object SubTub extends IOApp.Simple:
         IO.pure(cfg)
 
       case Invalid(errs) =>
-        IO.raiseError(RuntimeException(s"Errors when loading config: ${errs.mkString_("\n")}"))
+        IO.raiseError(RuntimeException(("Errors when loading config:" :: errs).mkString_("\n")))
 
   def resource: Resource[IO, Unit] =
     for
