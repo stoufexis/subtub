@@ -1,5 +1,3 @@
-import Dependencies._
-
 ThisBuild / scalaVersion     := "3.3.4"
 ThisBuild / version          := "0.1.0-SNAPSHOT"
 ThisBuild / organization     := "com.stoufexis"
@@ -53,8 +51,5 @@ lazy val root = (project in file("."))
   .settings(
     name := "subtub",
     scalacOptions ++= compileFlags,
-    libraryDependencies ++= http ++ effect ++ serdes ++ log,
-    libraryDependencies += munit % Test
+    libraryDependencies ++= http ++ effect ++ serdes ++ log
   )
-
-// See https://www.scala-sbt.org/1.x/docs/Using-Sonatype.html for instructions on how to publish to Sonatype.
