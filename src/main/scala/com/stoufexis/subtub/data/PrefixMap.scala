@@ -6,21 +6,21 @@ import com.stoufexis.subtub.typeclass.*
 // TODO: test, optimize
 case class PrefixMap[P: Prefix, K, V](
   val node:    Map[K, V],
-  val subtree: Map[Char, PrefixMap[P, K, V]]
+  val subtree: Map[String, PrefixMap[P, K, V]]
 ):
-  private def updatedSubtree(c: Char)(f: Option[PrefixMap[P, K, V]] => Option[PrefixMap[P, K, V]])
+  private def updatedSubtree(c: String)(f: Option[PrefixMap[P, K, V]] => Option[PrefixMap[P, K, V]])
     : PrefixMap[P, K, V] =
     PrefixMap(node, subtree.updatedWith(c)(f))
 
   def positionedAt(p: P): PrefixMap[P, K, V] =
     p.prefixHead match
       case None    => this
-      case Some(c) => subtree.get(c).fold(empty)(_.positionedAt(p.prefixTail))
+      case Some(s) => subtree.get(s).fold(empty)(_.positionedAt(p.prefixTail))
 
   def isEmpty(p: P): Boolean =
     p.prefixHead match
       case None    => isEmpty
-      case Some(c) => subtree.get(c).fold(true)(_.isEmpty(p.prefixTail))
+      case Some(s) => subtree.get(s).fold(true)(_.isEmpty(p.prefixTail))
 
   def isEmpty: Boolean =
     node.isEmpty && subtree.isEmpty
@@ -28,13 +28,13 @@ case class PrefixMap[P: Prefix, K, V](
   def nodeAt(p: P): Map[K, V] =
     p.prefixHead match
       case None    => node
-      case Some(c) => subtree.get(c).fold(Map.empty)(_.nodeAt(p.prefixTail))
+      case Some(s) => subtree.get(s).fold(Map.empty)(_.nodeAt(p.prefixTail))
 
   def replaceNodeAt(p: P, replacement: Map[K, V]): PrefixMap[P, K, V] =
     p.prefixHead match
       case None => PrefixMap(replacement, subtree)
-      case Some(c) =>
-        updatedSubtree(c):
+      case Some(s) =>
+        updatedSubtree(s):
           case Some(pm) =>
             Some(pm.replaceNodeAt(p.prefixTail, replacement)).filterNot(_.isEmpty)
           case None =>
@@ -43,8 +43,8 @@ case class PrefixMap[P: Prefix, K, V](
   def removeAt(p: P, key: K): PrefixMap[P, K, V] =
     p.prefixHead match
       case None => removeAt(key)
-      case Some(c) =>
-        updatedSubtree(c):
+      case Some(s) =>
+        updatedSubtree(s):
           case Some(pm) => Some(pm.removeAt(p.prefixTail, key)).filterNot(_.isEmpty)
           case None     => None
 
@@ -54,8 +54,8 @@ case class PrefixMap[P: Prefix, K, V](
   def updateAt(p: P, key: K, value: V): PrefixMap[P, K, V] =
     p.prefixHead match
       case None => updateAt(key, value)
-      case Some(c) =>
-        updatedSubtree(c):
+      case Some(s) =>
+        updatedSubtree(s):
           case Some(pm) => Some(pm.updateAt(p.prefixTail, key, value))
           case None     => Some(empty.updateAt(p.prefixTail, key, value))
 
@@ -65,16 +65,16 @@ case class PrefixMap[P: Prefix, K, V](
   def getMatching(p: P): List[V] =
     p.prefixHead match
       case None    => getMatching
-      case Some(c) => subtree.get(c).toList.flatMap(_.getMatching(p.prefixTail))
+      case Some(s) => subtree.get(s).toList.flatMap(_.getMatching(p.prefixTail))
 
   def getMatching: List[V] =
     node.values.toList ++ subtree.values.flatMap(_.getMatching).toList
 
-  def print(root: Char, printNode: Map[K, V] => String): List[String] =
+  def print(root: String, printNode: Map[K, V] => String): List[String] =
     val lines: List[String] =
       for
-        (char, prefixMap) <- subtree.toList
-        subtreeLine <- prefixMap.print(char, printNode)
+        (str, prefixMap) <- subtree.toList
+        subtreeLine      <- prefixMap.print(str, printNode)
       yield subtreeLine
 
     (if lines.isEmpty then List("") else lines.map("--" + _)).map: l =>
