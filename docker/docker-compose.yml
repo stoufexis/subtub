@@ -1,0 +1,9 @@
+services:
+  subtub:
+    image: "subtub:0.1.0-SNAPSHOT"
+    ports:
+      - "8080:80"
+    environment:
+      SUBTUB_BIND_HOST: "0.0.0.0"
+      SUBTUB_BIND_PORT: "80"
+      SUBTUB_SHARD_COUNT: "100"

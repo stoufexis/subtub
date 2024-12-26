@@ -48,8 +48,11 @@ lazy val log: Seq[ModuleID] =
   )
 
 lazy val root = (project in file("."))
+  .enablePlugins(DockerPlugin, JavaAppPackaging)
   .settings(
     name := "subtub",
     scalacOptions ++= compileFlags,
-    libraryDependencies ++= http ++ effect ++ serdes ++ log
+    libraryDependencies ++= http ++ effect ++ serdes ++ log,
+    // docker
+    dockerBaseImage := "openjdk:11",
   )
