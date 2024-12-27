@@ -26,3 +26,6 @@ object PositionedPrefixMap:
     def getMatching: List[V] = pm.getMatching
 
     def allNodes: List[Map[K, V]] = pm.allNodes
+
+  def apply[P, K, V](pm: PrefixMap[P, K, V], posAt: P): PositionedPrefixMap[K, V] =
+    apply(pm.positionedAt(posAt))

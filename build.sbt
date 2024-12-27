@@ -47,12 +47,17 @@ lazy val log: Seq[ModuleID] =
     "ch.qos.logback" % "logback-classic" % "1.5.6"
   )
 
+lazy val test: Seq[ModuleID] =
+  Seq(
+    "com.disneystreaming" %% "weaver-cats" % "0.8.4" % Test
+  )
+
 lazy val root = (project in file("."))
   .enablePlugins(DockerPlugin, JavaAppPackaging)
   .settings(
     name := "subtub",
     scalacOptions ++= compileFlags,
-    libraryDependencies ++= http ++ effect ++ serdes ++ log,
+    libraryDependencies ++= http ++ effect ++ serdes ++ log ++ test,
     // docker
     dockerBaseImage := "openjdk:11",
   )

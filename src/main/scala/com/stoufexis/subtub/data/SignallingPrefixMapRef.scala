@@ -30,7 +30,7 @@ object SignallingPrefixMapRef:
         p => arr(Math.abs(p.hashKey % shardCount))
 
       val positioned: P => PrefixMap[P, K, V] => PositionedPrefixMap[K, V] =
-        p => pm => PositionedPrefixMap(pm.positionedAt(p))
+        p => pm => PositionedPrefixMap(pm, p)
 
       val recombine: P => PrefixMap[P, K, V] => PositionedPrefixMap[K, V] => PrefixMap[P, K, V] =
         p => pm => ppm => pm.replaceNodeAt(p, ppm.node)

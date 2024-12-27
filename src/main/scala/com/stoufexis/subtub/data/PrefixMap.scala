@@ -70,6 +70,9 @@ case class PrefixMap[P: Prefix, K, V](
   def getMatching: List[V] =
     node.values.toList ++ subtree.values.flatMap(_.getMatching).toList
 
+  def allNodes: List[Map[K, V]] =
+    node :: subtree.toList.flatMap((_, p) => p.allNodes)
+
   def print(root: String, printNode: Map[K, V] => String): List[String] =
     val lines: List[String] =
       for
@@ -79,9 +82,6 @@ case class PrefixMap[P: Prefix, K, V](
 
     (if lines.isEmpty then List("") else lines.map("--" + _)).map: l =>
       s"$root(${printNode(node)})" + l
-
-  def allNodes: List[Map[K, V]] =
-    node :: subtree.toList.flatMap((_, p) => p.allNodes)
 
 object PrefixMap:
   def empty[P: Prefix, K, V]: PrefixMap[P, K, V] =
