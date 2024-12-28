@@ -9,6 +9,7 @@ import weaver.*
 import com.stoufexis.subtub.model.*
 
 import scala.concurrent.duration.*
+
 import java.util.concurrent.TimeoutException
 
 object BrokerSuite extends SimpleIOSuite:
@@ -195,8 +196,9 @@ object BrokerSuite extends SimpleIOSuite:
         st.take(take).timeout(timeout).compile.toList
 
     for
-      b  <- Broker[IO](100)
-      _  <- b.publishAll.start
+      b <- Broker[IO](100)
+      _ <- b.publishAll.start
+
       _  <- IO.sleep(50.millis)
       s1 <- b.suscribeNoPull(stream1)
       _  <- IO.sleep(100.millis)
@@ -209,8 +211,7 @@ object BrokerSuite extends SimpleIOSuite:
       o1 <- s1.toList(3, 100.millis)
       o2 <- s2.toList(2, 100.millis)
       o3 <- s3.toList(1, 100.millis)
-      o4 <- s4.toList(1, 100.millis).recover:
-        case _: TimeoutException => Nil
+      o4 <- s4.toList(1, 100.millis).recover { case _: TimeoutException => Nil }
     yield expect.all(
       o1 == List(msg(1), msg(2), msg(3)).map((stream0, _)),
       o2 == List(msg(2), msg(3)).map((stream0, _)),
