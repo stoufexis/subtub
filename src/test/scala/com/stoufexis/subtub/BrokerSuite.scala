@@ -9,6 +9,7 @@ import weaver.*
 import com.stoufexis.subtub.model.*
 
 import scala.concurrent.duration.*
+import java.util.concurrent.TimeoutException
 
 object BrokerSuite extends SimpleIOSuite:
   // TODO: Test behavior of broker with 1 shard vs many
@@ -17,11 +18,12 @@ object BrokerSuite extends SimpleIOSuite:
     StreamId(str).getOrElse(sys.error("Bug in the test"))
 
   given Logger[IO] with
-    def error(t:       Throwable)(message: => String): IO[Unit] = IO.unit
-    def warn(t:        Throwable)(message: => String): IO[Unit] = IO.unit
-    def info(t:        Throwable)(message: => String): IO[Unit] = IO.unit
-    def debug(t:       Throwable)(message: => String): IO[Unit] = IO.unit
-    def trace(t:       Throwable)(message: => String): IO[Unit] = IO.unit
+    def error(t: Throwable)(message: => String): IO[Unit] = IO.unit
+    def warn(t:  Throwable)(message: => String): IO[Unit] = IO.unit
+    def info(t:  Throwable)(message: => String): IO[Unit] = IO.unit
+    def debug(t: Throwable)(message: => String): IO[Unit] = IO.unit
+    def trace(t: Throwable)(message: => String): IO[Unit] = IO.unit
+
     def error(message: => String): IO[Unit] = IO.unit
     def warn(message:  => String): IO[Unit] = IO.unit
     def info(message:  => String): IO[Unit] = IO.unit
@@ -168,3 +170,52 @@ object BrokerSuite extends SimpleIOSuite:
       _ <- b.publish10
       o <- s.collectAll(1, 1.second)
     yield expect(o == List(stream -> msg(9)))
+
+  test("publishStream routes to timely subscribers"):
+    val stream0: StreamId = streamId("a:")
+    val stream1: StreamId = streamId("a:b")
+    val stream2: StreamId = streamId("a:c")
+    val stream3: StreamId = streamId("a:d")
+
+    def msg(i: Int): Message =
+      Message(s"Hello: $i")
+
+    val messages: Stream[IO, Message] =
+      Stream.eval(IO.sleep(100.millis) as msg(1)) ++
+        Stream.eval(IO.sleep(100.millis) as msg(2)) ++
+        Stream.eval(IO.sleep(100.millis) as msg(3))
+
+    extension (b: Broker[IO])
+      def publishAll: IO[Unit] =
+        b.publish(Set(stream0)).apply(messages).compile.drain
+
+      def suscribeNoPull(stream: StreamId): IO[Stream[IO, (StreamId, Message)]] =
+        b.subscribeWithoutPulling(Set(stream), 100)
+
+    extension (st: Stream[IO, (StreamId, Message)])
+      def toList(take: Int, timeout: FiniteDuration): IO[List[(StreamId, Message)]] =
+        st.take(take).timeout(timeout).compile.toList
+
+    for
+      b  <- Broker[IO](100)
+      _  <- b.publishAll.start
+      _  <- IO.sleep(50.millis)
+      s1 <- b.suscribeNoPull(stream1)
+      _  <- IO.sleep(100.millis)
+      s2 <- b.suscribeNoPull(stream2)
+      _  <- IO.sleep(100.millis)
+      s3 <- b.suscribeNoPull(stream3)
+      _  <- IO.sleep(100.millis)
+      s4 <- b.suscribeNoPull(stream3)
+
+      o1 <- s1.toList(3, 100.millis)
+      o2 <- s2.toList(2, 100.millis)
+      o3 <- s3.toList(1, 100.millis)
+      o4 <- s4.toList(1, 100.millis).recover:
+        case _: TimeoutException => Nil
+    yield expect.all(
+      o1 == List(msg(1), msg(2), msg(3)).map((stream0, _)),
+      o2 == List(msg(2), msg(3)).map((stream0, _)),
+      o3 == List(msg(3)).map((stream0, _)),
+      o4 == Nil
+    )
