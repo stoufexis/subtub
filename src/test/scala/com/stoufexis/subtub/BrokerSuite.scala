@@ -12,8 +12,6 @@ import scala.concurrent.duration.*
 import java.util.concurrent.TimeoutException
 
 object BrokerSuite extends SimpleIOSuite:
-  // TODO: Test behavior of broker with 1 shard vs many
-
   def streamId(str: String): StreamId =
     StreamId(str).getOrElse(sys.error("Bug in the test"))
 
