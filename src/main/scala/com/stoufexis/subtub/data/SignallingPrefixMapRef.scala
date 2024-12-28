@@ -1,12 +1,11 @@
 package com.stoufexis.subtub.data
 
+import cats.*
 import cats.effect.*
 import cats.implicits.given
 import fs2.concurrent.SignallingRef
 
 import com.stoufexis.subtub.typeclass.*
-import cats.kernel.*
-import cats.kernel.Monoid
 
 trait SignallingPrefixMapRef[F[_], P, K, V]:
   def get(p: P): SignallingRef[F, PositionedPrefixMap[K, V]]
@@ -14,30 +13,33 @@ trait SignallingPrefixMapRef[F[_], P, K, V]:
   def collectFromAll[A: Monoid](f: PrefixMap[P, K, V] => A): F[A]
 
 object SignallingPrefixMapRef:
-  def apply[F[_]: Concurrent, P: Prefix: ShardKey, K, V](
-    shardCount: Int
-  ): F[SignallingPrefixMapRef[F, P, K, V]] =
-    val prefixMaps: F[List[SignallingRef[F, PrefixMap[P, K, V]]]] =
-      List
-        .fill(shardCount)(SignallingRef[F].of(PrefixMap.empty))
-        .sequence
+  def apply[F[_]: Concurrent, P: Prefix: ShardKey, K, V](shardCount: Int)
+    : F[SignallingPrefixMapRef[F, P, K, V]] =
+    List
+      .fill(shardCount)(SignallingRef[F].of(PrefixMap.empty))
+      .sequence
+      .map(fromRefs[F, P, K, V])
 
-    prefixMaps.map: list =>
-      val arr: IArray[SignallingRef[F, PrefixMap[P, K, V]]] =
-        IArray.from(list)
+  def fromRefs[F[_]: Applicative, P: Prefix: ShardKey, K, V](refs: List[SignallingRef[F, PrefixMap[P, K, V]]])
+    : SignallingPrefixMapRef[F, P, K, V] =
+    val shardCount: Int =
+      refs.length
 
-      val refFunction: P => SignallingRef[F, PrefixMap[P, K, V]] =
-        p => arr(Math.abs(p.hashKey % shardCount))
+    val arr: IArray[SignallingRef[F, PrefixMap[P, K, V]]] =
+      IArray.from(refs)
 
-      val positioned: P => PrefixMap[P, K, V] => PositionedPrefixMap[K, V] =
-        p => pm => PositionedPrefixMap(pm, p)
+    val refFunction: P => SignallingRef[F, PrefixMap[P, K, V]] =
+      p => arr(Math.abs(p.hashKey % shardCount))
 
-      val recombine: P => PrefixMap[P, K, V] => PositionedPrefixMap[K, V] => PrefixMap[P, K, V] =
-        p => pm => ppm => pm.replaceNodeAt(p, ppm.node)
+    val positioned: P => PrefixMap[P, K, V] => PositionedPrefixMap[K, V] =
+      p => pm => PositionedPrefixMap(pm, p)
 
-      new:
-        def get(p: P): SignallingRef[F, PositionedPrefixMap[K, V]] =
-          SignallingRef.lens(refFunction(p))(positioned(p), recombine(p))
+    val recombine: P => PrefixMap[P, K, V] => PositionedPrefixMap[K, V] => PrefixMap[P, K, V] =
+      p => pm => ppm => pm.replaceNodeAt(p, ppm.node)
 
-        def collectFromAll[A: Monoid](f: PrefixMap[P, K, V] => A): F[A] =
-          list.traverse(_.get.map(f)).map(_.combineAll)
+    new:
+      def get(p: P): SignallingRef[F, PositionedPrefixMap[K, V]] =
+        SignallingRef.lens(refFunction(p))(positioned(p), recombine(p))
+
+      def collectFromAll[A: Monoid](f: PrefixMap[P, K, V] => A): F[A] =
+        refs.traverse(_.get.map(f)).map(_.combineAll)

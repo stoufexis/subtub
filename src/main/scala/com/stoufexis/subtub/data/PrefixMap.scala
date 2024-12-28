@@ -12,15 +12,16 @@ case class PrefixMap[P: Prefix, K, V](
     : PrefixMap[P, K, V] =
     PrefixMap(node, subtree.updatedWith(c)(f))
 
-  def positionedAt(p: P): PrefixMap[P, K, V] =
+  def positionedAt(p: P): (PrefixMap[P, K, V], List[V]) =
     p.prefixHead match
-      case None    => this
-      case Some(s) => subtree.get(s).fold(empty)(_.positionedAt(p.prefixTail))
+      case None => (PrefixMap(node, subtree), List.empty)
+      case Some(s) =>
+        val nodeValues: List[V] =
+          node.valuesIterator.toList
 
-  def isEmpty(p: P): Boolean =
-    p.prefixHead match
-      case None    => isEmpty
-      case Some(s) => subtree.get(s).fold(true)(_.isEmpty(p.prefixTail))
+        subtree.get(s).fold((empty, nodeValues)): pm =>
+          val (pm2, nv2) = pm.positionedAt(p.prefixTail)
+          (pm2, nodeValues ++ nv2)
 
   def isEmpty: Boolean =
     node.isEmpty && subtree.isEmpty
@@ -65,13 +66,10 @@ case class PrefixMap[P: Prefix, K, V](
   def getMatching(p: P): List[V] =
     p.prefixHead match
       case None    => getMatching
-      case Some(s) => subtree.get(s).toList.flatMap(_.getMatching(p.prefixTail))
+      case Some(s) => node.values.toList ++ subtree.get(s).toList.flatMap(_.getMatching(p.prefixTail))
 
   def getMatching: List[V] =
     node.values.toList ++ subtree.values.flatMap(_.getMatching).toList
-
-  def allNodes: List[Map[K, V]] =
-    node :: subtree.toList.flatMap((_, p) => p.allNodes)
 
   def print(root: String, printNode: Map[K, V] => String): List[String] =
     val lines: List[String] =
