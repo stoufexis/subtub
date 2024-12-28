@@ -116,3 +116,30 @@ object BrokerSuite extends SimpleIOSuite:
   test(
     "Shard count of 1: a message gets routed from a publisher to a subscriber when there is a common prefix between the published and subscribed stream ids"
   )(routingTest(1))
+
+  test("Overflown subscriber queues drop old messages"):
+    def msg(i: Int): Message =
+      Message(s"Hello: $i")
+
+    val stream: StreamId = streamId("a:")
+
+    extension (b: Broker[IO])
+      def publish10: IO[Unit] =
+        List.range(0, 10).map(i => b.publish1(Set(stream), msg(i))).sequence_
+
+      def suscribeNoPull(maxQueued: Int): IO[Stream[IO, (StreamId, Message)]] =
+        b.subscribeWithoutPulling(Set(stream), maxQueued)
+
+    extension (st: Stream[IO, (StreamId, Message)])
+      def collectAll(take: Int, timeout: FiniteDuration): IO[List[(StreamId, Message)]] =
+        st.take(take)
+          .timeout(timeout)
+          .compile
+          .toList
+
+    for
+      b <- Broker[IO](100)
+      s <- b.suscribeNoPull(1)
+      _ <- b.publish10
+      o <- s.collectAll(1, 1.second)
+    yield expect(o == List(stream -> msg(9)))

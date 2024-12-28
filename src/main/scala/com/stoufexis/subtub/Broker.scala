@@ -16,6 +16,10 @@ trait Broker[F[_]]:
 
   def publish(keys: Set[StreamId]): Pipe[F, Message, Nothing]
 
+  /** Registers the internal queue but delays pulling until the stream is evaluated
+    */
+  def subscribeWithoutPulling(keys: Set[StreamId], maxQueued: Int): F[Stream[F, (StreamId, Message)]]
+
   def subscribe(keys: Set[StreamId], maxQueued: Int): Stream[F, (StreamId, Message)]
 
 object Broker:
@@ -66,19 +70,24 @@ object Broker:
                 .concurrently(publishers.parJoinUnbounded)
                 .drain
 
-      override def subscribe(keys: Set[StreamId], maxQueued: Int): Stream[F, (StreamId, Message)] =
+      override def subscribeWithoutPulling(
+        keys:      Set[StreamId],
+        maxQueued: Int
+      ): F[Stream[F, (StreamId, Message)]] =
         val newSubscriber: F[(Unique.Token, Subscriber)] =
           for
             t <- T.unique
             q <- Queue.circularBuffer[F, (StreamId, Message)](maxQueued)
+            _ <- topics.subscribeToAll(keys, (t, q))
           yield (t, q)
 
-        Stream.eval(newSubscriber).flatMap:
-          case sub @ (token, queue) =>
-            Stream
-              .eval(topics.subscribeToAll(keys, sub))
-              .flatMap(_ => Stream.fromQueueUnterminated(queue))
-              .onFinalize(topics.unsubscribeFromAll(keys, token))
+        newSubscriber.map: (token, queue) =>
+          Stream
+            .fromQueueUnterminated(queue)
+            .onFinalize(topics.unsubscribeFromAll(keys, token))
+
+      override def subscribe(keys: Set[StreamId], maxQueued: Int): Stream[F, (StreamId, Message)] =
+        Stream.eval(subscribeWithoutPulling(keys, maxQueued)).flatten
 
       def publishStream(key: StreamId): Pipe[F, Message, Nothing] =
         def loop(
