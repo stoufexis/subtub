@@ -37,8 +37,7 @@ object BrokerSuite extends SimpleIOSuite:
       o <- b.subscribe(Set(stream), 100).timeoutOnPullTo(1.second, Stream.empty).compile.toList
     yield expect(o.isEmpty)
 
-  test("A message gets routed from a publisher to a subscriber when there is a common prefix " +
-    "between the published and subscribed stream ids"):
+  def routingTest(shardCount: Int): IO[Expectations] =
     val msg: Message = Message("hello")
 
     val stream0: StreamId = streamId("a:")
@@ -92,7 +91,7 @@ object BrokerSuite extends SimpleIOSuite:
       expectation.toList.flatMap(_._2.toList).length
 
     for
-      b <- Broker[IO](100)
+      b <- Broker[IO](shardCount)
       // waits half a second to make sure all subscribers have registered
       // this is much more time than it realistically takes, but we are keeping it simple for testing
       _ <- (IO.sleep(500.millis) >> b.publishAll).start
@@ -108,3 +107,12 @@ object BrokerSuite extends SimpleIOSuite:
       o(stream5) == expectation(stream5),
       o(stream6) == expectation(stream6)
     )
+  end routingTest
+
+  test(
+    "Shard count of 100: a message gets routed from a publisher to a subscriber when there is a common prefix between the published and subscribed stream ids"
+  )(routingTest(100))
+
+  test(
+    "Shard count of 1: a message gets routed from a publisher to a subscriber when there is a common prefix between the published and subscribed stream ids"
+  )(routingTest(1))
