@@ -58,6 +58,7 @@ object BrokerSuite extends SimpleIOSuite:
           b.publish1(Set(stream5), msg) >>
           b.publish1(Set(stream6), msg)
 
+    extension (b: Broker[IO])
       /** Outputs a map with structure Map[subscribed stream id, Map[published stream id, message]]
         */
       def collectAll(take: Int, timeout: FiniteDuration): IO[Map[StreamId, Map[StreamId, Message]]] =
@@ -110,14 +111,36 @@ object BrokerSuite extends SimpleIOSuite:
   end routingTest
 
   test(
-    "Shard count of 100: a message gets routed from a publisher to a subscriber when there is a common prefix between the published and subscribed stream ids"
+    "shard count of 100: a message gets routed from a publisher to a subscriber when there is a common prefix between the published and subscribed stream ids"
   )(routingTest(100))
 
   test(
-    "Shard count of 1: a message gets routed from a publisher to a subscriber when there is a common prefix between the published and subscribed stream ids"
+    "shard count of 1: a message gets routed from a publisher to a subscriber when there is a common prefix between the published and subscribed stream ids"
   )(routingTest(1))
 
-  test("Overflown subscriber queues drop old messages"):
+  test("publish and subscribe to multiple stream ids works like single ones"):
+    val msg: Message = Message(s"Hello")
+
+    val stream0: StreamId = streamId("a:")
+    val stream1: StreamId = streamId("a:b")
+    val stream2: StreamId = streamId("a:c")
+    val stream3: StreamId = streamId("a:d")
+
+    for
+      b  <- Broker[IO](100)
+      s  <- b.subscribeWithoutPulling(Set(stream1, stream2, stream3), 100)
+      _  <- b.publish1(Set(stream0), msg)
+      o1 <- s.take(3).map(_._1).compile.toList
+
+      s1 <- b.subscribeWithoutPulling(Set(stream0), 100)
+      _  <- b.publish1(Set(stream1, stream2, stream3), msg)
+      o2 <- s1.take(3).map(_._1).compile.toList
+    yield expect.all(
+      o1.sortBy(_.string) == List.fill(3)(stream0),
+      o2.sortBy(_.string) == List(stream1, stream2, stream3)
+    )
+
+  test("overflown subscriber queues drop old messages"):
     def msg(i: Int): Message =
       Message(s"Hello: $i")
 
