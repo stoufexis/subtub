@@ -58,19 +58,22 @@ object BrokerSuite extends SimpleIOSuite:
           b.publish1(Set(stream5), msg) >>
           b.publish1(Set(stream6), msg)
 
-    extension (b: Broker[IO])
+      def subToAll: IO[List[Stream[IO, (StreamId, (StreamId, Message))]]] =
+        List(
+          b.subscribeWithoutPulling(Set(stream0), 100).map(_.map((stream0, _))),
+          b.subscribeWithoutPulling(Set(stream1), 100).map(_.map((stream1, _))),
+          b.subscribeWithoutPulling(Set(stream2), 100).map(_.map((stream2, _))),
+          b.subscribeWithoutPulling(Set(stream3), 100).map(_.map((stream3, _))),
+          b.subscribeWithoutPulling(Set(stream4), 100).map(_.map((stream4, _))),
+          b.subscribeWithoutPulling(Set(stream5), 100).map(_.map((stream5, _))),
+          b.subscribeWithoutPulling(Set(stream6), 100).map(_.map((stream6, _)))
+        ).sequence
+
+    extension (l: List[Stream[IO, (StreamId, (StreamId, Message))]])
       /** Outputs a map with structure Map[subscribed stream id, Map[published stream id, message]]
         */
       def collectAll(take: Int, timeout: FiniteDuration): IO[Map[StreamId, Map[StreamId, Message]]] =
-        Stream(
-          b.subscribe(Set(stream0), 100).map((stream0, _)),
-          b.subscribe(Set(stream1), 100).map((stream1, _)),
-          b.subscribe(Set(stream2), 100).map((stream2, _)),
-          b.subscribe(Set(stream3), 100).map((stream3, _)),
-          b.subscribe(Set(stream4), 100).map((stream4, _)),
-          b.subscribe(Set(stream5), 100).map((stream5, _)),
-          b.subscribe(Set(stream6), 100).map((stream6, _))
-        )
+        Stream.iterable(l)
           .parJoinUnbounded
           .take(take)
           .timeout(timeout)
@@ -93,12 +96,11 @@ object BrokerSuite extends SimpleIOSuite:
 
     for
       b <- Broker[IO](shardCount)
-      // waits half a second to make sure all subscribers have registered
-      // this is much more time than it realistically takes, but we are keeping it simple for testing
-      _ <- (IO.sleep(500.millis) >> b.publishAll).start
+      s <- b.subToAll
+      _ <- b.publishAll
       // In case we receive less than the expected amount the subscribers will hang forever
       // To force the test to terminate in those cases, we apply a timeout
-      o <- b.collectAll(messageCount, 1.second)
+      o <- s.collectAll(messageCount, 1.second)
     yield expect.all(
       o(stream0) == expectation(stream0),
       o(stream1) == expectation(stream1),
