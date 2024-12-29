@@ -1,9 +1,10 @@
 package com.stoufexis.subtub.model
 
+import cats.kernel.Order
+
 import com.stoufexis.subtub.typeclass.*
 
 import scala.util.hashing.MurmurHash3
-import cats.kernel.Order
 
 /** String of more than 3 characters. First three characters are the partition key. All of the characters
   * comprise the prefix.
