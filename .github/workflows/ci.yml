@@ -32,5 +32,8 @@ jobs:
       - name: Setup sbt
         uses: sbt/setup-sbt@v1
 
+      - name: Check formatting
+        run: sbt '++ ${{ matrix.scala }}' scalafmtCheckAll
+
       - name: Test project
         run: sbt '++ ${{ matrix.scala }}' test
