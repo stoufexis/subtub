@@ -62,9 +62,9 @@ object PrefixMapSuite extends SimpleIOSuite:
         .updateAt("abc", "C", 3)
 
     expect.all(
-      inserted.getMatching("") == List(1, 2, 3), // sanity check
+      inserted.getMatching("") == List(1, 2, 3),                    // sanity check
       inserted.removeAt("a", "B").getMatching("") == List(1, 2, 3), // should remove nothing
-      inserted.removeAt("ab", "B").getMatching("") == List(1, 3) // should successfully remove
+      inserted.removeAt("ab", "B").getMatching("") == List(1, 3)    // should successfully remove
     )
 
     val removedAll: PrefixMap[String, String, Int] =
@@ -85,5 +85,5 @@ object PrefixMapSuite extends SimpleIOSuite:
       replaced.nodeAt("") == Map.empty,
       replaced.nodeAt("a") == Map("A" -> 1, "B" -> 2),
       replaced.nodeAt("ab") == Map("C" -> 3, "D" -> 4),
-      replaced.nodeAt("abc") == Map.empty,
+      replaced.nodeAt("abc") == Map.empty
     )

@@ -1,8 +1,8 @@
 package com.stoufexis.subtub.config
 
 import cats.data.*
-import com.comcast.ip4s.*
 import cats.implicits.given
+import com.comcast.ip4s.*
 
 case class Config(
   bindHost:   Hostname,

@@ -12,7 +12,7 @@ extension [A: Prefix](a: A)
 
 object Prefix:
   given Prefix[String] with
-    def prefixHead(a: String): Option[String] = 
+    def prefixHead(a: String): Option[String] =
       if a.isEmpty then None else Some(a.take(1))
 
     def prefixTail(a: String): String =

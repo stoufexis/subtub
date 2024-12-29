@@ -1,7 +1,6 @@
 package com.stoufexis.subtub.typeclass
 
-/**
-  * Type class for retrieving the shard of a type.
+/** Type class for retrieving the shard of a type.
   */
 trait ShardOf[A]:
   def shard(a: A, count: Int): Int
