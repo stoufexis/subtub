@@ -1,6 +1,7 @@
 package com.stoufexis.subtub
 
 import cats.effect.IO
+import cats.data.*
 import cats.implicits.given
 import fs2.*
 import org.typelevel.log4cats.Logger
@@ -34,8 +35,8 @@ object BrokerSuite extends SimpleIOSuite:
 
     for
       b <- Broker[IO](100)
-      _ <- b.publish1(Set(stream), Message("Hello"))
-      o <- b.subscribe(Set(stream), 100).timeoutOnPullTo(1.second, Stream.empty).compile.toList
+      _ <- b.publish1(NonEmptySet.of(stream), Message("Hello"))
+      o <- b.subscribe(NonEmptySet.of(stream), 100).timeoutOnPullTo(1.second, Stream.empty).compile.toList
     yield expect(o.isEmpty)
 
   def routingTest(shardCount: Int): IO[Expectations] =
@@ -51,23 +52,23 @@ object BrokerSuite extends SimpleIOSuite:
 
     extension (b: Broker[IO])
       def publishAll: IO[Unit] =
-        b.publish1(Set(stream0), msg) >>
-          b.publish1(Set(stream1), msg) >>
-          b.publish1(Set(stream2), msg) >>
-          b.publish1(Set(stream3), msg) >>
-          b.publish1(Set(stream4), msg) >>
-          b.publish1(Set(stream5), msg) >>
-          b.publish1(Set(stream6), msg)
+        b.publish1(NonEmptySet.of(stream0), msg) >>
+          b.publish1(NonEmptySet.of(stream1), msg) >>
+          b.publish1(NonEmptySet.of(stream2), msg) >>
+          b.publish1(NonEmptySet.of(stream3), msg) >>
+          b.publish1(NonEmptySet.of(stream4), msg) >>
+          b.publish1(NonEmptySet.of(stream5), msg) >>
+          b.publish1(NonEmptySet.of(stream6), msg)
 
       def subToAll: IO[List[Stream[IO, (StreamId, (StreamId, Message))]]] =
         List(
-          b.subscribeWithoutPulling(Set(stream0), 100).map(_.map((stream0, _))),
-          b.subscribeWithoutPulling(Set(stream1), 100).map(_.map((stream1, _))),
-          b.subscribeWithoutPulling(Set(stream2), 100).map(_.map((stream2, _))),
-          b.subscribeWithoutPulling(Set(stream3), 100).map(_.map((stream3, _))),
-          b.subscribeWithoutPulling(Set(stream4), 100).map(_.map((stream4, _))),
-          b.subscribeWithoutPulling(Set(stream5), 100).map(_.map((stream5, _))),
-          b.subscribeWithoutPulling(Set(stream6), 100).map(_.map((stream6, _)))
+          b.subscribeWithoutPulling(NonEmptySet.of(stream0), 100).map(_.map((stream0, _))),
+          b.subscribeWithoutPulling(NonEmptySet.of(stream1), 100).map(_.map((stream1, _))),
+          b.subscribeWithoutPulling(NonEmptySet.of(stream2), 100).map(_.map((stream2, _))),
+          b.subscribeWithoutPulling(NonEmptySet.of(stream3), 100).map(_.map((stream3, _))),
+          b.subscribeWithoutPulling(NonEmptySet.of(stream4), 100).map(_.map((stream4, _))),
+          b.subscribeWithoutPulling(NonEmptySet.of(stream5), 100).map(_.map((stream5, _))),
+          b.subscribeWithoutPulling(NonEmptySet.of(stream6), 100).map(_.map((stream6, _)))
         ).sequence
 
     extension (l: List[Stream[IO, (StreamId, (StreamId, Message))]])
@@ -131,12 +132,12 @@ object BrokerSuite extends SimpleIOSuite:
 
     for
       b  <- Broker[IO](100)
-      s  <- b.subscribeWithoutPulling(Set(stream1, stream2, stream3), 100)
-      _  <- b.publish1(Set(stream0), msg)
+      s  <- b.subscribeWithoutPulling(NonEmptySet.of(stream1, stream2, stream3), 100)
+      _  <- b.publish1(NonEmptySet.of(stream0), msg)
       o1 <- s.take(3).map(_._1).compile.toList
 
-      s1 <- b.subscribeWithoutPulling(Set(stream0), 100)
-      _  <- b.publish1(Set(stream1, stream2, stream3), msg)
+      s1 <- b.subscribeWithoutPulling(NonEmptySet.of(stream0), 100)
+      _  <- b.publish1(NonEmptySet.of(stream1, stream2, stream3), msg)
       o2 <- s1.take(3).map(_._1).compile.toList
     yield expect.all(
       o1.sortBy(_.string) == List.fill(3)(stream0),
@@ -151,10 +152,10 @@ object BrokerSuite extends SimpleIOSuite:
 
     extension (b: Broker[IO])
       def publish10: IO[Unit] =
-        List.range(0, 10).map(i => b.publish1(Set(stream), msg(i))).sequence_
+        List.range(0, 10).map(i => b.publish1(NonEmptySet.of(stream), msg(i))).sequence_
 
       def suscribeNoPull(maxQueued: Int): IO[Stream[IO, (StreamId, Message)]] =
-        b.subscribeWithoutPulling(Set(stream), maxQueued)
+        b.subscribeWithoutPulling(NonEmptySet.of(stream), maxQueued)
 
     extension (st: Stream[IO, (StreamId, Message)])
       def collectAll(take: Int, timeout: FiniteDuration): IO[List[(StreamId, Message)]] =
@@ -186,10 +187,10 @@ object BrokerSuite extends SimpleIOSuite:
 
     extension (b: Broker[IO])
       def publishAll: IO[Unit] =
-        b.publish(Set(stream0)).apply(messages).compile.drain
+        b.publish(NonEmptySet.of(stream0)).apply(messages).compile.drain
 
       def suscribeNoPull(stream: StreamId): IO[Stream[IO, (StreamId, Message)]] =
-        b.subscribeWithoutPulling(Set(stream), 100)
+        b.subscribeWithoutPulling(NonEmptySet.of(stream), 100)
 
     extension (st: Stream[IO, (StreamId, Message)])
       def toList(take: Int, timeout: FiniteDuration): IO[List[(StreamId, Message)]] =

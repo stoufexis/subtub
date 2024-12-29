@@ -3,6 +3,7 @@ package com.stoufexis.subtub.model
 import com.stoufexis.subtub.typeclass.*
 
 import scala.util.hashing.MurmurHash3
+import cats.kernel.Order
 
 /** String of more than 3 characters. First three characters are the partition key. All of the characters
   * comprise the prefix.
@@ -30,3 +31,5 @@ object StreamId:
   given ShardOf[StreamId] with
     def shard(a: StreamId, count: Int): Int =
       MurmurHash3.stringHash(a.shardKey).abs % count
+
+  given Order[StreamId] = Order.by(_.string)

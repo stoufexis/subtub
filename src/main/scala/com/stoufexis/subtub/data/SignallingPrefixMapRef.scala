@@ -10,8 +10,6 @@ import com.stoufexis.subtub.typeclass.*
 trait SignallingPrefixMapRef[F[_], P, K, V]:
   def get(p: P): SignallingRef[F, PositionedPrefixMap[K, V]]
 
-  def collectFromAll[A: Monoid](f: PrefixMap[P, K, V] => A): F[A]
-
 object SignallingPrefixMapRef:
   def apply[F[_]: Concurrent, P: Prefix: ShardOf, K, V](shardCount: Int)
     : F[SignallingPrefixMapRef[F, P, K, V]] =
@@ -37,9 +35,4 @@ object SignallingPrefixMapRef:
     val recombine: P => PrefixMap[P, K, V] => PositionedPrefixMap[K, V] => PrefixMap[P, K, V] =
       p => pm => ppm => pm.replaceNodeAt(p, ppm.node)
 
-    new:
-      def get(p: P): SignallingRef[F, PositionedPrefixMap[K, V]] =
-        SignallingRef.lens(refFunction(p))(positioned(p), recombine(p))
-
-      def collectFromAll[A: Monoid](f: PrefixMap[P, K, V] => A): F[A] =
-        refs.traverse(_.get.map(f)).map(_.combineAll)
+    p => SignallingRef.lens(refFunction(p))(positioned(p), recombine(p))
