@@ -16,7 +16,7 @@ import org.http4s.websocket.WebSocketFrame
 import org.http4s.{EntityDecoder, Response}
 import org.typelevel.log4cats.Logger
 
-import com.stoufexis.subtub.Broker
+import com.stoufexis.subtub.broker.Broker
 import com.stoufexis.subtub.model.*
 import com.stoufexis.subtub.util.*
 
@@ -47,7 +47,7 @@ object Server:
       Stream.awakeDelay[F](30.seconds) as WebSocketFrame.Ping()
 
     def subscribeTo(streams: NonEmptySet[StreamId]): Stream[F, WebSocketFrame] =
-      broker.subscribe(streams, 10).map(frame)
+      broker.subscribe(streams, 10).map(frame) // TODO do not hardcode queue size
 
     def publishTo(streams: NonEmptySet[StreamId]): Pipe[F, WebSocketFrame, Nothing] =
       broker.publish(streams).evalContramapFilter:

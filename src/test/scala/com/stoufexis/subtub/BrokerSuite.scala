@@ -1,12 +1,13 @@
 package com.stoufexis.subtub
 
-import cats.effect.IO
 import cats.data.*
+import cats.effect.IO
 import cats.implicits.given
 import fs2.*
 import org.typelevel.log4cats.Logger
 import weaver.*
 
+import com.stoufexis.subtub.broker.Broker
 import com.stoufexis.subtub.model.*
 
 import scala.concurrent.duration.*

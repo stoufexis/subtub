@@ -8,6 +8,7 @@ import org.http4s.ember.server.EmberServerBuilder
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
+import com.stoufexis.subtub.broker.Broker
 import com.stoufexis.subtub.config.Config
 import com.stoufexis.subtub.http.*
 
