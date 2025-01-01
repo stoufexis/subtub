@@ -36,18 +36,21 @@ object Server:
       def unapply(params: Map[String, collection.Seq[String]]): Option[Seq[String]] =
         params.get("streams").map(_.toSeq)
 
+    object MaxQueuedParam extends OptionalQueryParamDecoderMatcher[MaxQueued]("max_queued")
+
     def frame(sid: StreamId, msg: Message): WebSocketFrame =
-      val json: Json =
-        Json.obj("published_to" -> sid.string.asJson).deepMerge(msg.asJson)
+      WebSocketFrame.Text:
+        Json
+          .obj("published_to" -> sid.string.asJson)
+          .deepMerge(msg.asJson)
+          .printWith(Printer.noSpaces)
 
-      WebSocketFrame.Text(json.printWith(Printer.noSpaces))
-
-    // Probably should contain a payload, and then the Pong responses verified against it
+    // Probably should contain a payload which is matched with the Pong responses
     val pingStream: Stream[F, WebSocketFrame] =
       Stream.awakeDelay[F](30.seconds) as WebSocketFrame.Ping()
 
-    def subscribeTo(streams: NonEmptySet[StreamId]): Stream[F, WebSocketFrame] =
-      broker.subscribe(streams, 10).map(frame) // TODO do not hardcode queue size
+    def subscribeTo(streams: NonEmptySet[StreamId], maxQueued: Option[MaxQueued]): Stream[F, WebSocketFrame] =
+      broker.subscribe(streams, maxQueued.combineAll).map(frame)
 
     def publishTo(streams: NonEmptySet[StreamId]): Pipe[F, WebSocketFrame, Nothing] =
       broker.publish(streams).evalContramapFilter:
@@ -69,8 +72,8 @@ object Server:
         case None                 => BadRequest("Malformed stream id")
 
     HttpRoutes.of:
-      case GET -> Root / "subscribe" :? StreamsParam(streams) =>
-        decoded(streams)(s => ws.build(Stream(subscribeTo(s), pingStream).parJoinUnbounded, ignored))
+      case GET -> Root / "subscribe" :? StreamsParam(streams) +& MaxQueuedParam(mq) =>
+        decoded(streams)(s => ws.build(Stream(subscribeTo(s, mq), pingStream).parJoinUnbounded, ignored))
 
       case GET -> Root / "publish_stream" :? StreamsParam(streams) =>
         decoded(streams)(s => ws.build(pingStream, publishTo(s)))

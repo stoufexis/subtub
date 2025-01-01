@@ -8,5 +8,5 @@ import com.stoufexis.subtub.model.*
 type Subscriber[F[_]] = Queue[F, (StreamId, Message)]
 
 object Subscriber:
-  def apply[F[_]: Concurrent](maxQueued: Int): F[Subscriber[F]] =
-    Queue.circularBuffer(maxQueued)
+  def apply[F[_]: Concurrent](maxQueued: MaxQueued): F[Subscriber[F]] =
+    Queue.circularBuffer(maxQueued.get)

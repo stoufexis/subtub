@@ -15,6 +15,8 @@ import scala.concurrent.duration.*
 import java.util.concurrent.TimeoutException
 
 object BrokerSuite extends SimpleIOSuite:
+  val q100: MaxQueued = MaxQueued(100)
+
   def streamId(str: String): StreamId =
     StreamId(str).getOrElse(sys.error("Bug in the test"))
 
@@ -37,7 +39,7 @@ object BrokerSuite extends SimpleIOSuite:
     for
       b <- Broker[IO](100)
       _ <- b.publish1(NonEmptySet.of(stream), Message("Hello"))
-      o <- b.subscribe(NonEmptySet.of(stream), 100).timeoutOnPullTo(1.second, Stream.empty).compile.toList
+      o <- b.subscribe(NonEmptySet.of(stream), q100).timeoutOnPullTo(1.second, Stream.empty).compile.toList
     yield expect(o.isEmpty)
 
   def routingTest(shardCount: Int): IO[Expectations] =
@@ -63,13 +65,13 @@ object BrokerSuite extends SimpleIOSuite:
 
       def subToAll: IO[List[Stream[IO, (StreamId, (StreamId, Message))]]] =
         List(
-          b.subscribeWithoutPulling(NonEmptySet.of(stream0), 100).map(_.map((stream0, _))),
-          b.subscribeWithoutPulling(NonEmptySet.of(stream1), 100).map(_.map((stream1, _))),
-          b.subscribeWithoutPulling(NonEmptySet.of(stream2), 100).map(_.map((stream2, _))),
-          b.subscribeWithoutPulling(NonEmptySet.of(stream3), 100).map(_.map((stream3, _))),
-          b.subscribeWithoutPulling(NonEmptySet.of(stream4), 100).map(_.map((stream4, _))),
-          b.subscribeWithoutPulling(NonEmptySet.of(stream5), 100).map(_.map((stream5, _))),
-          b.subscribeWithoutPulling(NonEmptySet.of(stream6), 100).map(_.map((stream6, _)))
+          b.subscribeWithoutPulling(NonEmptySet.of(stream0), q100).map(_.map((stream0, _))),
+          b.subscribeWithoutPulling(NonEmptySet.of(stream1), q100).map(_.map((stream1, _))),
+          b.subscribeWithoutPulling(NonEmptySet.of(stream2), q100).map(_.map((stream2, _))),
+          b.subscribeWithoutPulling(NonEmptySet.of(stream3), q100).map(_.map((stream3, _))),
+          b.subscribeWithoutPulling(NonEmptySet.of(stream4), q100).map(_.map((stream4, _))),
+          b.subscribeWithoutPulling(NonEmptySet.of(stream5), q100).map(_.map((stream5, _))),
+          b.subscribeWithoutPulling(NonEmptySet.of(stream6), q100).map(_.map((stream6, _)))
         ).sequence
 
     extension (l: List[Stream[IO, (StreamId, (StreamId, Message))]])
@@ -133,11 +135,11 @@ object BrokerSuite extends SimpleIOSuite:
 
     for
       b  <- Broker[IO](100)
-      s  <- b.subscribeWithoutPulling(NonEmptySet.of(stream1, stream2, stream3), 100)
+      s  <- b.subscribeWithoutPulling(NonEmptySet.of(stream1, stream2, stream3), q100)
       _  <- b.publish1(NonEmptySet.of(stream0), msg)
       o1 <- s.take(3).map(_._1).compile.toList
 
-      s1 <- b.subscribeWithoutPulling(NonEmptySet.of(stream0), 100)
+      s1 <- b.subscribeWithoutPulling(NonEmptySet.of(stream0), q100)
       _  <- b.publish1(NonEmptySet.of(stream1, stream2, stream3), msg)
       o2 <- s1.take(3).map(_._1).compile.toList
     yield expect.all(
@@ -155,7 +157,7 @@ object BrokerSuite extends SimpleIOSuite:
       def publish10: IO[Unit] =
         List.range(0, 10).map(i => b.publish1(NonEmptySet.of(stream), msg(i))).sequence_
 
-      def suscribeNoPull(maxQueued: Int): IO[Stream[IO, (StreamId, Message)]] =
+      def suscribeNoPull(maxQueued: MaxQueued): IO[Stream[IO, (StreamId, Message)]] =
         b.subscribeWithoutPulling(NonEmptySet.of(stream), maxQueued)
 
     extension (st: Stream[IO, (StreamId, Message)])
@@ -167,7 +169,7 @@ object BrokerSuite extends SimpleIOSuite:
 
     for
       b <- Broker[IO](100)
-      s <- b.suscribeNoPull(1)
+      s <- b.suscribeNoPull(MaxQueued(1))
       _ <- b.publish10
       o <- s.collectAll(1, 1.second)
     yield expect(o == List(stream -> msg(9)))
@@ -191,7 +193,7 @@ object BrokerSuite extends SimpleIOSuite:
         b.publish(NonEmptySet.of(stream0)).apply(messages).compile.drain
 
       def suscribeNoPull(stream: StreamId): IO[Stream[IO, (StreamId, Message)]] =
-        b.subscribeWithoutPulling(NonEmptySet.of(stream), 100)
+        b.subscribeWithoutPulling(NonEmptySet.of(stream), q100)
 
     extension (st: Stream[IO, (StreamId, Message)])
       def toList(take: Int, timeout: FiniteDuration): IO[List[(StreamId, Message)]] =
