@@ -62,8 +62,8 @@ object Broker:
 
       def publishStream(key: StreamId): Pipe[F, Message, Nothing] =
         def loop(
-          msgOrSt: Stream[F, Either[Chunk[Message], List[Subscriber[F]]]],
-          subs:    List[Subscriber[F]]
+          msgOrSt: Stream[F, Either[Chunk[Message], Chain[Subscriber[F]]]],
+          subs:    Chain[Subscriber[F]]
         ): Pull[F, Nothing, Unit] =
           msgOrSt.pull.uncons1.flatMap:
             case None                      => Pull.done

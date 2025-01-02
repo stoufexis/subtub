@@ -1,5 +1,6 @@
 package com.stoufexis.subtub
 
+import cats.data.Chain
 import weaver.*
 
 import com.stoufexis.subtub.data.*
@@ -17,9 +18,9 @@ object PrefixMapSuite extends SimpleIOSuite:
         .updateAt("ad", "D", 4)
         .updateAt("fgh", "E", 5)
 
-    val matchedByAll  = List(1, 2, 3)
-    val matchedBySome = List(4)
-    val matchedByOne  = List(5)
+    val matchedByAll  = Chain(1, 2, 3)
+    val matchedBySome = Chain(4)
+    val matchedByOne  = Chain(5)
 
     expect.all(
       inserted.getMatching("") == matchedByAll ++ matchedBySome ++ matchedByOne,
@@ -36,7 +37,7 @@ object PrefixMapSuite extends SimpleIOSuite:
         .updateAt("a", "C", 3)
         .updateAt("ab", "D", 4)
 
-    val matchedByAll = List(1, 3, 2, 4)
+    val matchedByAll = Chain(1, 3, 2, 4)
 
     expect.all(
       inserted.getMatching("") == matchedByAll,
@@ -57,9 +58,9 @@ object PrefixMapSuite extends SimpleIOSuite:
         .updateAt("abc", "C", 3)
 
     expect.all(
-      inserted.getMatching("") == List(1, 2, 3),                    // sanity check
-      inserted.removeAt("a", "B").getMatching("") == List(1, 2, 3), // should remove nothing
-      inserted.removeAt("ab", "B").getMatching("") == List(1, 3)    // should successfully remove
+      inserted.getMatching("") == Chain(1, 2, 3),                    // sanity check
+      inserted.removeAt("a", "B").getMatching("") == Chain(1, 2, 3), // should remove nothing
+      inserted.removeAt("ab", "B").getMatching("") == Chain(1, 3)    // should successfully remove
     )
 
     val removedAll: PrefixMap[String, String, Int] =
@@ -68,7 +69,9 @@ object PrefixMapSuite extends SimpleIOSuite:
         .removeAt("ab", "B")
         .removeAt("abc", "C")
 
-    expect(removedAll.getMatching("") == Nil && removedAll.isEmpty) // also verifies that simple isEmpty works
+    expect(
+      removedAll.getMatching("") == Chain.empty && removedAll.isEmpty
+    ) // also verifies that simple isEmpty works
 
   pureTest("replaceNodeAt works"):
     val replaced: PrefixMap[String, String, Int] =

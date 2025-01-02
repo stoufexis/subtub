@@ -12,9 +12,9 @@ import com.stoufexis.subtub.model.*
 import com.stoufexis.subtub.typeclass.*
 
 trait BrokerState[F[_]]:
-  def get(id: StreamId): F[List[Subscriber[F]]]
+  def get(id: StreamId): F[Chain[Subscriber[F]]]
 
-  def getUpdates(id: StreamId): Stream[F, List[Subscriber[F]]]
+  def getUpdates(id: StreamId): Stream[F, Chain[Subscriber[F]]]
 
   def subscribeToAll(keys: NonEmptySet[StreamId], sub: Subscriber[F]): F[Token]
 
@@ -35,10 +35,10 @@ object BrokerState:
           def shard(id: StreamId): SignallingRef[F, PMap] =
             arr(id.shard(arr.length))
 
-          def get(id: StreamId): F[List[Subscriber[F]]] =
+          def get(id: StreamId): F[Chain[Subscriber[F]]] =
             shard(id).get.map(_.getMatching(id))
 
-          def getUpdates(id: StreamId): Stream[F, List[Subscriber[F]]] =
+          def getUpdates(id: StreamId): Stream[F, Chain[Subscriber[F]]] =
             shard(id).discrete.map(_.getMatching(id))
 
           def subscribeToAll(keys: NonEmptySet[StreamId], sub: Subscriber[F]): F[Token] =

@@ -1,5 +1,7 @@
 package com.stoufexis.subtub.data
 
+import cats.data.*
+
 import com.stoufexis.subtub.data.PrefixMap.empty
 import com.stoufexis.subtub.typeclass.*
 
@@ -46,13 +48,16 @@ case class PrefixMap[P: Prefix, K, V](
           case Some(pm) => Some(pm.updateAt(p.prefixTail, key, value))
           case None     => Some(empty.updateAt(p.prefixTail, key, value))
 
-  def getMatching(p: P): List[V] =
+  def getMatching(p: P): Chain[V] =
     p.prefixHead match
-      case None    => getMatching
-      case Some(s) => node.values.toList ++ subtree.get(s).toList.flatMap(_.getMatching(p.prefixTail))
+      case None => getMatching
+      case Some(s) =>
+        val sub = Chain.fromOption(subtree.get(s)).flatMap(_.getMatching(p.prefixTail))
+        Chain.fromIterableOnce(node.valuesIterator) ++ sub
 
-  def getMatching: List[V] =
-    node.values.toList ++ subtree.values.flatMap(_.getMatching).toList
+  def getMatching: Chain[V] =
+    val sub = Chain.fromIterableOnce(subtree.valuesIterator).flatMap(_.getMatching)
+    Chain.fromIterableOnce(node.valuesIterator) ++ sub
 
   def print(root: String, printNode: Map[K, V] => String): List[String] =
     val lines: List[String] =
