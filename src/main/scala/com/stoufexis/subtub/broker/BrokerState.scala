@@ -4,8 +4,6 @@ import cats.data.*
 import cats.effect.*
 import cats.effect.kernel.Unique.Token
 import cats.implicits.given
-import fs2.*
-import fs2.concurrent.SignallingRef
 
 import com.stoufexis.subtub.data.*
 import com.stoufexis.subtub.model.*
@@ -13,8 +11,6 @@ import com.stoufexis.subtub.typeclass.*
 
 trait BrokerState[F[_]]:
   def get(id: StreamId): F[Chain[Subscriber[F]]]
-
-  def getUpdates(id: StreamId): Stream[F, Chain[Subscriber[F]]]
 
   def subscribeToAll(keys: NonEmptySet[StreamId], sub: Subscriber[F]): F[Token]
 
@@ -25,21 +21,18 @@ object BrokerState:
     type PMap = PrefixMap[StreamId, Token, Subscriber[F]]
 
     List
-      .fill(shardCount)(SignallingRef[F].of(PrefixMap.empty: PMap))
+      .fill(shardCount)(Ref[F].of(PrefixMap.empty: PMap))
       .sequence
-      .map: (list: List[SignallingRef[F, PMap]]) =>
+      .map: (list: List[Ref[F, PMap]]) =>
         new:
-          val arr: IArray[SignallingRef[F, PMap]] =
+          val arr: IArray[Ref[F, PMap]] =
             IArray.from(list)
 
-          def shard(id: StreamId): SignallingRef[F, PMap] =
+          def shard(id: StreamId): Ref[F, PMap] =
             arr(id.shard(arr.length))
 
           def get(id: StreamId): F[Chain[Subscriber[F]]] =
             shard(id).get.map(_.getMatching(id))
-
-          def getUpdates(id: StreamId): Stream[F, Chain[Subscriber[F]]] =
-            shard(id).discrete.map(_.getMatching(id))
 
           def subscribeToAll(keys: NonEmptySet[StreamId], sub: Subscriber[F]): F[Token] =
             for
