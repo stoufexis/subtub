@@ -5,7 +5,6 @@ import cats.data.*
 import com.stoufexis.subtub.data.PrefixMap.empty
 import com.stoufexis.subtub.typeclass.*
 
-// TODO: test, optimize
 case class PrefixMap[P: Prefix, K, V](
   val node:    Map[K, V],
   val subtree: Map[String, PrefixMap[P, K, V]]
