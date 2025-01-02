@@ -22,43 +22,30 @@ trait BrokerState[F[_]]:
 
 object BrokerState:
   def apply[F[_]](shardCount: Int)(using F: Concurrent[F], U: Unique[F]): F[BrokerState[F]] =
-    type PMap  = PrefixMap[StreamId, Token, Subscriber[F]]
-    type PPMap = PositionedPrefixMap[Token, Subscriber[F]]
+    type PMap = PrefixMap[StreamId, Token, Subscriber[F]]
 
     List
       .fill(shardCount)(SignallingRef[F].of(PrefixMap.empty: PMap))
       .sequence
       .map: (list: List[SignallingRef[F, PMap]]) =>
         new:
-          val shardCount: Int =
-            list.length
-
           val arr: IArray[SignallingRef[F, PMap]] =
             IArray.from(list)
 
-          val refFunction: StreamId => SignallingRef[F, PMap] =
-            p => arr(p.shard(shardCount))
-
-          val positioned: StreamId => PMap => PPMap =
-            p => pm => PositionedPrefixMap(pm, p)
-
-          val recombine: StreamId => PMap => PPMap => PMap =
-            p => pm => ppm => pm.replaceNodeAt(p, ppm.node)
-
-          val lensedRef: StreamId => SignallingRef[F, PPMap] =
-            p => SignallingRef.lens(refFunction(p))(positioned(p), recombine(p))
+          def shard(id: StreamId): SignallingRef[F, PMap] =
+            arr(id.shard(arr.length))
 
           def get(id: StreamId): F[List[Subscriber[F]]] =
-            lensedRef(id).get.map(_.getMatching)
+            shard(id).get.map(_.getMatching(id))
 
           def getUpdates(id: StreamId): Stream[F, List[Subscriber[F]]] =
-            lensedRef(id).discrete.map(_.getMatching)
+            shard(id).discrete.map(_.getMatching(id))
 
           def subscribeToAll(keys: NonEmptySet[StreamId], sub: Subscriber[F]): F[Token] =
             for
               token <- U.unique
-              _     <- keys.traverse_(lensedRef(_).update(_.updateAt(token, sub)))
+              _     <- keys.traverse_(k => shard(k).update(_.updateAt(k, token, sub)))
             yield token
 
           def unsubscribeFromAll(keys: NonEmptySet[StreamId], token: Token): F[Unit] =
-            keys.traverse_(lensedRef(_).update(_.removeAt(token)))
+            keys.traverse_(k => shard(k).update(_.removeAt(k, token)))

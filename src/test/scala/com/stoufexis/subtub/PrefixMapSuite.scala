@@ -25,12 +25,7 @@ object PrefixMapSuite extends SimpleIOSuite:
       inserted.getMatching("") == matchedByAll ++ matchedBySome ++ matchedByOne,
       inserted.getMatching("a") == matchedByAll ++ matchedBySome,
       inserted.getMatching("ab") == matchedByAll,
-      inserted.getMatching("abc") == matchedByAll,
-      // Identical cases for PositionedPrefixMap
-      PositionedPrefixMap(inserted, "").getMatching == matchedByAll ++ matchedBySome ++ matchedByOne,
-      PositionedPrefixMap(inserted, "a").getMatching == matchedByAll ++ matchedBySome,
-      PositionedPrefixMap(inserted, "ab").getMatching == matchedByAll,
-      PositionedPrefixMap(inserted, "abc").getMatching == matchedByAll
+      inserted.getMatching("abc") == matchedByAll
     )
 
   pureTest("updateAt at the same spot aggregates elements"):

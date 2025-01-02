@@ -12,17 +12,6 @@ case class PrefixMap[P: Prefix, K, V](
     : PrefixMap[P, K, V] =
     PrefixMap(node, subtree.updatedWith(c)(f))
 
-  def positionedAt(p: P): (PrefixMap[P, K, V], List[V]) =
-    p.prefixHead match
-      case None => (PrefixMap(node, subtree), List.empty)
-      case Some(s) =>
-        val nodeValues: List[V] =
-          node.valuesIterator.toList
-
-        subtree.get(s).fold((empty, nodeValues)): pm =>
-          val (pm2, nv2) = pm.positionedAt(p.prefixTail)
-          (pm2, nodeValues ++ nv2)
-
   def isEmpty: Boolean =
     node.isEmpty && subtree.isEmpty
 
@@ -43,25 +32,19 @@ case class PrefixMap[P: Prefix, K, V](
 
   def removeAt(p: P, key: K): PrefixMap[P, K, V] =
     p.prefixHead match
-      case None => removeAt(key)
+      case None => PrefixMap(node.removed(key), subtree)
       case Some(s) =>
         updatedSubtree(s):
           case Some(pm) => Some(pm.removeAt(p.prefixTail, key)).filterNot(_.isEmpty)
           case None     => None
 
-  def removeAt(key: K): PrefixMap[P, K, V] =
-    PrefixMap(node.removed(key), subtree)
-
   def updateAt(p: P, key: K, value: V): PrefixMap[P, K, V] =
     p.prefixHead match
-      case None => updateAt(key, value)
+      case None => PrefixMap(node.updated(key, value), subtree)
       case Some(s) =>
         updatedSubtree(s):
           case Some(pm) => Some(pm.updateAt(p.prefixTail, key, value))
           case None     => Some(empty.updateAt(p.prefixTail, key, value))
-
-  def updateAt(key: K, value: V): PrefixMap[P, K, V] =
-    PrefixMap(node.updated(key, value), subtree)
 
   def getMatching(p: P): List[V] =
     p.prefixHead match
