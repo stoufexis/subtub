@@ -34,7 +34,7 @@ object Server:
       def unapply(params: Map[String, collection.Seq[String]]): Option[Seq[String]] =
         params.get("streams").map(_.toSeq)
 
-    object MaxQueuedParam extends OptionalQueryParamDecoderMatcher[MaxQueued]("max_queued")
+    object MaxQueuedParam extends QueryParamDecoderMatcher[MaxQueued]("max_queued")
 
     def frame(msg: Message): WebSocketFrame =
       WebSocketFrame.Text(msg.asJson.printWith(Printer.noSpaces))
@@ -43,8 +43,8 @@ object Server:
     val pingStream: Stream[F, WebSocketFrame] =
       Stream.awakeDelay[F](30.seconds) as WebSocketFrame.Ping()
 
-    def subscribeTo(streams: NonEmptySet[StreamId], maxQueued: Option[MaxQueued]): Stream[F, WebSocketFrame] =
-      broker.subscribe(streams, maxQueued.combineAll).map(frame)
+    def subscribeTo(streams: NonEmptySet[StreamId], maxQueued: MaxQueued): Stream[F, WebSocketFrame] =
+      broker.subscribe(streams, maxQueued).map(frame)
 
     val ignored: Pipe[F, WebSocketFrame, Nothing] =
       _.evalMapFilter(fr => log.warn(s"Ignoring received message: $fr") as None)
