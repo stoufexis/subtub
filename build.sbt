@@ -60,5 +60,6 @@ lazy val root = (project in file("."))
     scalacOptions ++= compileFlags,
     libraryDependencies ++= http ++ effect ++ serdes ++ log ++ test,
     // docker
-    dockerBaseImage := "openjdk:11"
+    dockerBaseImage := "openjdk:11",
+    dockerRepository := Some("stefanostouf")
   )
