@@ -61,5 +61,6 @@ lazy val root = (project in file("."))
     libraryDependencies ++= http ++ effect ++ serdes ++ log ++ test,
     // docker
     dockerBaseImage := "openjdk:11",
-    dockerRepository := Some("stefanostouf")
+    dockerRepository := Some("stefanostouf"),
+    dockerUpdateLatest := true
   )
