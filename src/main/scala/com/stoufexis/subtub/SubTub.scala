@@ -4,7 +4,9 @@ import cats.data.Validated.Invalid
 import cats.data.Validated.Valid
 import cats.effect.*
 import cats.implicits.given
+import org.http4s.HttpApp
 import org.http4s.ember.server.EmberServerBuilder
+import org.http4s.server.middleware.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
@@ -13,12 +15,23 @@ import com.stoufexis.subtub.config.Config
 import com.stoufexis.subtub.http.*
 
 object SubTub extends IOApp.Simple:
+  def errorHandler(t: Throwable, msg: => String)(using log: Logger[IO]): IO[Unit] =
+    log.error(t)(msg)
+
+  def withErrorLogging(http: HttpApp[IO])(using Logger[IO]) = ErrorHandling.Recover.total(
+    ErrorAction.log(
+      http,
+      messageFailureLogAction = errorHandler,
+      serviceErrorLogAction   = errorHandler
+    )
+  )
+
   def server(broker: Broker[IO], cfg: Config)(using log: Logger[IO]): Resource[IO, Unit] =
     EmberServerBuilder
       .default[IO]
       .withHost(cfg.bindHost)
       .withPort(cfg.bindPort)
-      .withHttpWebSocketApp(ws => Server.routes(ws, broker).orNotFound)
+      .withHttpWebSocketApp(ws => withErrorLogging(Server.routes(ws, broker).orNotFound))
       .build
       .void
 
