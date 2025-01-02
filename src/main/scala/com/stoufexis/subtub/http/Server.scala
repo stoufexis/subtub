@@ -1,7 +1,6 @@
 package com.stoufexis.subtub.http
 
 import _root_.io.circe.*
-import _root_.io.circe.parser.*
 import _root_.io.circe.syntax.*
 import cats.*
 import cats.data.*
@@ -18,7 +17,6 @@ import org.typelevel.log4cats.Logger
 
 import com.stoufexis.subtub.broker.Broker
 import com.stoufexis.subtub.model.*
-import com.stoufexis.subtub.util.*
 
 import scala.concurrent.duration.*
 
@@ -30,7 +28,7 @@ object Server:
     val dsl = Http4sDsl[F]
     import dsl.*
 
-    given EntityDecoder[F, Message] = jsonOf
+    given EntityDecoder[F, List[Message]] = jsonOf
 
     object StreamsParam:
       def unapply(params: Map[String, collection.Seq[String]]): Option[Seq[String]] =
@@ -52,16 +50,6 @@ object Server:
     def subscribeTo(streams: NonEmptySet[StreamId], maxQueued: Option[MaxQueued]): Stream[F, WebSocketFrame] =
       broker.subscribe(streams, maxQueued.combineAll).map(frame)
 
-    def publishTo(streams: NonEmptySet[StreamId]): Pipe[F, WebSocketFrame, Nothing] =
-      broker.publish(streams).evalContramapFilter:
-        case WebSocketFrame.Text((str, true)) =>
-          decode[Message](str) match
-            case Left(err)  => log.warn(err)(s"Failed to decode frame") as None
-            case Right(msg) => F.pure(Some(msg))
-
-        case fr =>
-          log.warn(s"Ignoring received message: $fr") as None
-
     val ignored: Pipe[F, WebSocketFrame, Nothing] =
       _.evalMapFilter(fr => log.warn(s"Ignoring received message: $fr") as None)
 
@@ -75,8 +63,5 @@ object Server:
       case GET -> Root / "subscribe" :? StreamsParam(streams) +& MaxQueuedParam(mq) =>
         decoded(streams)(s => ws.build(Stream(subscribeTo(s, mq), pingStream).parJoinUnbounded, ignored))
 
-      case GET -> Root / "publish_stream" :? StreamsParam(streams) =>
-        decoded(streams)(s => ws.build(pingStream, publishTo(s)))
-
-      case req @ POST -> Root / "publish_one" :? StreamsParam(streams) =>
-        decoded(streams)(s => req.as[Message].flatMap(broker.publish1(s, _)) >> Ok())
+      case req @ POST -> Root / "publish" :? StreamsParam(streams) =>
+        decoded(streams)(s => req.as[List[Message]].flatMap(broker.publish(s, _)) >> Ok())

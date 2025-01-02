@@ -38,7 +38,7 @@ object BrokerSuite extends SimpleIOSuite:
 
     for
       b <- Broker[IO](100)
-      _ <- b.publish1(NonEmptySet.of(stream), Message("Hello"))
+      _ <- b.publish(NonEmptySet.of(stream), Message("Hello"))
       o <- b.subscribe(NonEmptySet.of(stream), q100).timeoutOnPullTo(1.second, Stream.empty).compile.toList
     yield expect(o.isEmpty)
 
@@ -55,13 +55,13 @@ object BrokerSuite extends SimpleIOSuite:
 
     extension (b: Broker[IO])
       def publishAll: IO[Unit] =
-        b.publish1(NonEmptySet.of(stream0), msg) >>
-          b.publish1(NonEmptySet.of(stream1), msg) >>
-          b.publish1(NonEmptySet.of(stream2), msg) >>
-          b.publish1(NonEmptySet.of(stream3), msg) >>
-          b.publish1(NonEmptySet.of(stream4), msg) >>
-          b.publish1(NonEmptySet.of(stream5), msg) >>
-          b.publish1(NonEmptySet.of(stream6), msg)
+        b.publish(NonEmptySet.of(stream0), msg) >>
+          b.publish(NonEmptySet.of(stream1), msg) >>
+          b.publish(NonEmptySet.of(stream2), msg) >>
+          b.publish(NonEmptySet.of(stream3), msg) >>
+          b.publish(NonEmptySet.of(stream4), msg) >>
+          b.publish(NonEmptySet.of(stream5), msg) >>
+          b.publish(NonEmptySet.of(stream6), msg)
 
       def subToAll: IO[List[Stream[IO, (StreamId, (StreamId, Message))]]] =
         List(
@@ -136,11 +136,11 @@ object BrokerSuite extends SimpleIOSuite:
     for
       b  <- Broker[IO](100)
       s  <- b.subscribeWithoutPulling(NonEmptySet.of(stream1, stream2, stream3), q100)
-      _  <- b.publish1(NonEmptySet.of(stream0), msg)
+      _  <- b.publish(NonEmptySet.of(stream0), msg)
       o1 <- s.take(3).map(_._1).compile.toList
 
       s1 <- b.subscribeWithoutPulling(NonEmptySet.of(stream0), q100)
-      _  <- b.publish1(NonEmptySet.of(stream1, stream2, stream3), msg)
+      _  <- b.publish(NonEmptySet.of(stream1, stream2, stream3), msg)
       o2 <- s1.take(3).map(_._1).compile.toList
     yield expect.all(
       o1.sortBy(_.string) == List.fill(3)(stream0),
@@ -155,7 +155,7 @@ object BrokerSuite extends SimpleIOSuite:
 
     extension (b: Broker[IO])
       def publish10: IO[Unit] =
-        List.range(0, 10).map(i => b.publish1(NonEmptySet.of(stream), msg(i))).sequence_
+        List.range(0, 10).map(i => b.publish(NonEmptySet.of(stream), msg(i))).sequence_
 
       def suscribeNoPull(maxQueued: MaxQueued): IO[Stream[IO, (StreamId, Message)]] =
         b.subscribeWithoutPulling(NonEmptySet.of(stream), maxQueued)
@@ -190,7 +190,7 @@ object BrokerSuite extends SimpleIOSuite:
 
     extension (b: Broker[IO])
       def publishAll: IO[Unit] =
-        b.publish(NonEmptySet.of(stream0)).apply(messages).compile.drain
+        messages.evalTap(b.publish(NonEmptySet.of(stream0), _)).compile.drain
 
       def suscribeNoPull(stream: StreamId): IO[Stream[IO, (StreamId, Message)]] =
         b.subscribeWithoutPulling(NonEmptySet.of(stream), q100)

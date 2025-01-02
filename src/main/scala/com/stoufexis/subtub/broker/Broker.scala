@@ -10,9 +10,10 @@ import org.typelevel.log4cats.Logger
 import com.stoufexis.subtub.model.*
 
 trait Broker[F[_]]:
-  def publish1(keys: NonEmptySet[StreamId], message: Message): F[Unit]
+  def publish(keys: NonEmptySet[StreamId], messages: List[Message]): F[Unit]
 
-  def publish(keys: NonEmptySet[StreamId]): Pipe[F, Message, Nothing]
+  def publish(keys: NonEmptySet[StreamId], message: Message): F[Unit] =
+    publish(keys, List(message))
 
   /** Registers the internal queue but delays pulling until the stream is evaluated
     */
@@ -26,14 +27,10 @@ trait Broker[F[_]]:
 object Broker:
   def apply[F[_]](shardCount: Int)(using F: Concurrent[F], T: Unique[F], log: Logger[F]): F[Broker[F]] =
     for state <- BrokerState[F](shardCount) yield new:
-      override def publish1(keys: NonEmptySet[StreamId], message: Message): F[Unit] =
+      override def publish(keys: NonEmptySet[StreamId], messages: List[Message]): F[Unit] =
         keys.traverse_ : key =>
-          state.get(key).flatMap(_.traverse_(_.offer(key -> message)))
-
-      override def publish(keys: NonEmptySet[StreamId]): Pipe[F, Message, Nothing] =
-        if keys.size == 1
-        then publishStream(keys.head)
-        else _.broadcastThrough(keys.toList.map(publishStream)*).drain
+          state.get(key).flatMap: (c: Chain[Subscriber[F]]) =>
+            c.traverse_(q => messages.traverse_(msg => q.offer(key -> msg)))
 
       override def subscribeWithoutPulling(
         keys:      NonEmptySet[StreamId],
@@ -59,23 +56,3 @@ object Broker:
         maxQueued: MaxQueued
       ): Stream[F, (StreamId, Message)] =
         Stream.eval(subscribeWithoutPulling(keys, maxQueued)).flatten
-
-      def publishStream(key: StreamId): Pipe[F, Message, Nothing] =
-        def loop(
-          msgOrSt: Stream[F, Either[Chunk[Message], Chain[Subscriber[F]]]],
-          subs:    Chain[Subscriber[F]]
-        ): Pull[F, Nothing, Unit] =
-          msgOrSt.pull.uncons1.flatMap:
-            case None                      => Pull.done
-            case Some((Right(subs), tail)) => loop(tail, subs)
-            case Some((Left(messages), tail)) =>
-              Pull.eval(subs.traverse_(s => messages.traverse_(m => s.offer((key, m))))) >>
-                loop(tail, subs)
-
-        def publishLoop(messages: Stream[F, Message]): Pull[F, Nothing, Unit] =
-          state.getUpdates(key).pull.uncons1.flatMap:
-            case None => Pull.done
-            case Some((initSubs, updates)) =>
-              loop(updates.map(Right(_)) mergeHaltBoth messages.chunks.map(Left(_)), initSubs)
-
-        publishLoop(_).stream
