@@ -60,4 +60,6 @@ object Server:
         decoded(streams)(s => ws.build(Stream(subscribeTo(s, mq), pingStream).parJoinUnbounded, ignored))
 
       case req @ POST -> Root / "publish" =>
-        req.as[List[Message]].flatMap(broker.publish(_)) >> Ok()
+        req.attemptAs[List[Message]].value.flatMap:
+          case Left(fail)  => BadRequest(fail.message)
+          case Right(msgs) => broker.publish(msgs) >> Ok()
