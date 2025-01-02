@@ -65,13 +65,13 @@ object BrokerSuite extends SimpleIOSuite:
 
       def subToAll: IO[List[Stream[IO, (StreamId, Message)]]] =
         List(
-          b.subscribeWithoutPulling(NonEmptySet.of(stream0), q100).map(_.map((stream0, _))),
-          b.subscribeWithoutPulling(NonEmptySet.of(stream1), q100).map(_.map((stream1, _))),
-          b.subscribeWithoutPulling(NonEmptySet.of(stream2), q100).map(_.map((stream2, _))),
-          b.subscribeWithoutPulling(NonEmptySet.of(stream3), q100).map(_.map((stream3, _))),
-          b.subscribeWithoutPulling(NonEmptySet.of(stream4), q100).map(_.map((stream4, _))),
-          b.subscribeWithoutPulling(NonEmptySet.of(stream5), q100).map(_.map((stream5, _))),
-          b.subscribeWithoutPulling(NonEmptySet.of(stream6), q100).map(_.map((stream6, _)))
+          b.subscribeDeferred(NonEmptySet.of(stream0), q100).map(_.map((stream0, _))),
+          b.subscribeDeferred(NonEmptySet.of(stream1), q100).map(_.map((stream1, _))),
+          b.subscribeDeferred(NonEmptySet.of(stream2), q100).map(_.map((stream2, _))),
+          b.subscribeDeferred(NonEmptySet.of(stream3), q100).map(_.map((stream3, _))),
+          b.subscribeDeferred(NonEmptySet.of(stream4), q100).map(_.map((stream4, _))),
+          b.subscribeDeferred(NonEmptySet.of(stream5), q100).map(_.map((stream5, _))),
+          b.subscribeDeferred(NonEmptySet.of(stream6), q100).map(_.map((stream6, _)))
         ).sequence
 
     extension (l: List[Stream[IO, (StreamId, Message)]])
@@ -135,11 +135,11 @@ object BrokerSuite extends SimpleIOSuite:
 
     for
       b  <- Broker[IO](100)
-      s  <- b.subscribeWithoutPulling(NonEmptySet.of(stream1, stream2, stream3), q100)
+      s  <- b.subscribeDeferred(NonEmptySet.of(stream1, stream2, stream3), q100)
       _  <- b.publish(msg(stream0))
       o1 <- s.take(3).map(_._1).compile.toList
 
-      s1 <- b.subscribeWithoutPulling(NonEmptySet.of(stream0), q100)
+      s1 <- b.subscribeDeferred(NonEmptySet.of(stream0), q100)
       _  <- b.publish(List(stream1, stream2, stream3).map(msg))
       o2 <- s1.take(3).map(_._1).compile.toList
     yield expect.all(
@@ -158,7 +158,7 @@ object BrokerSuite extends SimpleIOSuite:
         List.range(0, 10).map(i => b.publish(msg(stream, i))).sequence_
 
       def suscribeNoPull(maxQueued: MaxQueued): IO[Stream[IO, Message]] =
-        b.subscribeWithoutPulling(NonEmptySet.of(stream), maxQueued)
+        b.subscribeDeferred(NonEmptySet.of(stream), maxQueued)
 
     extension (st: Stream[IO, Message])
       def collectAll(take: Int, timeout: FiniteDuration): IO[List[Message]] =
@@ -193,7 +193,7 @@ object BrokerSuite extends SimpleIOSuite:
         messages(stream0).evalTap(b.publish).compile.drain
 
       def suscribeNoPull(stream: StreamId): IO[Stream[IO, Message]] =
-        b.subscribeWithoutPulling(NonEmptySet.of(stream), q100)
+        b.subscribeDeferred(NonEmptySet.of(stream), q100)
 
     extension (st: Stream[IO, Message])
       def toList(take: Int, timeout: FiniteDuration): IO[List[Message]] =

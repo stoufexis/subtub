@@ -14,9 +14,9 @@ trait Broker[F[_]]:
 
   def publish(message: Message): F[Unit] = publish(List(message))
 
-  /** Registers the internal queue but delays pulling until the stream is evaluated
+  /** Registers the internal queue but defers pulling until the stream is evaluated
     */
-  def subscribeWithoutPulling(keys: NonEmptySet[StreamId], maxQueued: MaxQueued): F[Stream[F, Message]]
+  def subscribeDeferred(keys: NonEmptySet[StreamId], maxQueued: MaxQueued): F[Stream[F, Message]]
 
   def subscribe(keys: NonEmptySet[StreamId], maxQueued: MaxQueued): Stream[F, Message]
 
@@ -34,7 +34,7 @@ object Broker:
             .get(key)
             .flatMap(_.traverse_(q => messages.traverse_(q.offer)))
 
-      override def subscribeWithoutPulling(
+      override def subscribeDeferred(
         keys:      NonEmptySet[StreamId],
         maxQueued: MaxQueued
       ): F[Stream[F, Message]] =
@@ -57,4 +57,4 @@ object Broker:
         keys:      NonEmptySet[StreamId],
         maxQueued: MaxQueued
       ): Stream[F, Message] =
-        Stream.eval(subscribeWithoutPulling(keys, maxQueued)).flatten
+        Stream.eval(subscribeDeferred(keys, maxQueued)).flatten
