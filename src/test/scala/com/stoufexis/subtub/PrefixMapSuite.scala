@@ -72,16 +72,3 @@ object PrefixMapSuite extends SimpleIOSuite:
     expect(
       removedAll.getMatching("") == Chain.empty && removedAll.isEmpty
     ) // also verifies that simple isEmpty works
-
-  pureTest("replaceNodeAt works"):
-    val replaced: PrefixMap[String, String, Int] =
-      stringMap
-        .replaceNodeAt("a", Map("A" -> 1, "B" -> 2))
-        .replaceNodeAt("ab", Map("C" -> 3, "D" -> 4))
-
-    expect.all(
-      replaced.nodeAt("") == Map.empty,
-      replaced.nodeAt("a") == Map("A" -> 1, "B" -> 2),
-      replaced.nodeAt("ab") == Map("C" -> 3, "D" -> 4),
-      replaced.nodeAt("abc") == Map.empty
-    )

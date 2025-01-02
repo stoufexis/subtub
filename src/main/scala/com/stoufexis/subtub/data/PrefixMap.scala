@@ -21,16 +21,6 @@ case class PrefixMap[P: Prefix, K, V](
       case None    => node
       case Some(s) => subtree.get(s).fold(Map.empty)(_.nodeAt(p.prefixTail))
 
-  def replaceNodeAt(p: P, replacement: Map[K, V]): PrefixMap[P, K, V] =
-    p.prefixHead match
-      case None => PrefixMap(replacement, subtree)
-      case Some(s) =>
-        updatedSubtree(s):
-          case Some(pm) =>
-            Some(pm.replaceNodeAt(p.prefixTail, replacement)).filterNot(_.isEmpty)
-          case None =>
-            Option.when(replacement.nonEmpty)(empty.replaceNodeAt(p.prefixTail, replacement))
-
   def removeAt(p: P, key: K): PrefixMap[P, K, V] =
     p.prefixHead match
       case None => PrefixMap(node.removed(key), subtree)
