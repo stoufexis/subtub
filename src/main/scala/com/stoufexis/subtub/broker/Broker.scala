@@ -10,32 +10,34 @@ import org.typelevel.log4cats.Logger
 import com.stoufexis.subtub.model.*
 
 trait Broker[F[_]]:
-  def publish(keys: NonEmptySet[StreamId], messages: List[Message]): F[Unit]
+  def publish(messages: List[Message]): F[Unit]
 
-  def publish(keys: NonEmptySet[StreamId], message: Message): F[Unit] =
-    publish(keys, List(message))
+  def publish(message: Message): F[Unit] = publish(List(message))
 
   /** Registers the internal queue but delays pulling until the stream is evaluated
     */
-  def subscribeWithoutPulling(
-    keys:      NonEmptySet[StreamId],
-    maxQueued: MaxQueued
-  ): F[Stream[F, (StreamId, Message)]]
+  def subscribeWithoutPulling(keys: NonEmptySet[StreamId], maxQueued: MaxQueued): F[Stream[F, Message]]
 
-  def subscribe(keys: NonEmptySet[StreamId], maxQueued: MaxQueued): Stream[F, (StreamId, Message)]
+  def subscribe(keys: NonEmptySet[StreamId], maxQueued: MaxQueued): Stream[F, Message]
 
 object Broker:
   def apply[F[_]](shardCount: Int)(using F: Concurrent[F], T: Unique[F], log: Logger[F]): F[Broker[F]] =
     for state <- BrokerState[F](shardCount) yield new:
-      override def publish(keys: NonEmptySet[StreamId], messages: List[Message]): F[Unit] =
-        keys.traverse_ : key =>
-          state.get(key).flatMap: (c: Chain[Subscriber[F]]) =>
-            c.traverse_(q => messages.traverse_(msg => q.offer(key -> msg)))
+      override def publish(messages: List[Message]): F[Unit] =
+        import alleycats.std.iterable.given
+
+        val groupped: Iterable[(StreamId, List[Message])] =
+          messages.groupBy(_.publish_to)
+
+        groupped.traverse_ : (key, messages) =>
+          state
+            .get(key)
+            .flatMap(_.traverse_(q => messages.traverse_(q.offer)))
 
       override def subscribeWithoutPulling(
         keys:      NonEmptySet[StreamId],
         maxQueued: MaxQueued
-      ): F[Stream[F, (StreamId, Message)]] =
+      ): F[Stream[F, Message]] =
         val newSubscriber: F[(Unique.Token, Subscriber[F])] =
           for
             q <- Subscriber[F](maxQueued)
@@ -54,5 +56,5 @@ object Broker:
       override def subscribe(
         keys:      NonEmptySet[StreamId],
         maxQueued: MaxQueued
-      ): Stream[F, (StreamId, Message)] =
+      ): Stream[F, Message] =
         Stream.eval(subscribeWithoutPulling(keys, maxQueued)).flatten

@@ -36,12 +36,8 @@ object Server:
 
     object MaxQueuedParam extends OptionalQueryParamDecoderMatcher[MaxQueued]("max_queued")
 
-    def frame(sid: StreamId, msg: Message): WebSocketFrame =
-      WebSocketFrame.Text:
-        Json
-          .obj("published_to" -> sid.string.asJson)
-          .deepMerge(msg.asJson)
-          .printWith(Printer.noSpaces)
+    def frame(msg: Message): WebSocketFrame =
+      WebSocketFrame.Text(msg.asJson.printWith(Printer.noSpaces))
 
     // Probably should contain a payload which is matched with the Pong responses
     val pingStream: Stream[F, WebSocketFrame] =
@@ -63,5 +59,5 @@ object Server:
       case GET -> Root / "subscribe" :? StreamsParam(streams) +& MaxQueuedParam(mq) =>
         decoded(streams)(s => ws.build(Stream(subscribeTo(s, mq), pingStream).parJoinUnbounded, ignored))
 
-      case req @ POST -> Root / "publish" :? StreamsParam(streams) =>
-        decoded(streams)(s => req.as[List[Message]].flatMap(broker.publish(s, _)) >> Ok())
+      case req @ POST -> Root / "publish" =>
+        req.as[List[Message]].flatMap(broker.publish(_)) >> Ok()

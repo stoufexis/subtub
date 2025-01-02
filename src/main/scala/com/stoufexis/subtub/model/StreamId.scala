@@ -1,6 +1,7 @@
 package com.stoufexis.subtub.model
 
 import cats.kernel.Order
+import io.circe.*
 
 import com.stoufexis.subtub.typeclass.*
 
@@ -34,3 +35,9 @@ object StreamId:
       MurmurHash3.stringHash(a.shardKey).abs % count
 
   given Order[StreamId] = Order.by(_.string)
+
+  given Codec[StreamId] =
+    Codec.from(
+      Decoder[String].emap(apply(_).toRight("Invalid stream id format")),
+      Encoder[String].contramap(_.string)
+    )

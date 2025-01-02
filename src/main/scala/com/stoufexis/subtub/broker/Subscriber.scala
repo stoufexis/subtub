@@ -5,7 +5,7 @@ import cats.effect.std.Queue
 
 import com.stoufexis.subtub.model.*
 
-type Subscriber[F[_]] = Queue[F, (StreamId, Message)]
+type Subscriber[F[_]] = Queue[F, Message]
 
 object Subscriber:
   def apply[F[_]: Concurrent](maxQueued: MaxQueued): F[Subscriber[F]] =

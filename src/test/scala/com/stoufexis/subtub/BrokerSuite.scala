@@ -38,12 +38,12 @@ object BrokerSuite extends SimpleIOSuite:
 
     for
       b <- Broker[IO](100)
-      _ <- b.publish(NonEmptySet.of(stream), Message("Hello"))
+      _ <- b.publish(Message(stream, "Hello"))
       o <- b.subscribe(NonEmptySet.of(stream), q100).timeoutOnPullTo(1.second, Stream.empty).compile.toList
     yield expect(o.isEmpty)
 
   def routingTest(shardCount: Int): IO[Expectations] =
-    val msg: Message = Message("hello")
+    def msg(s: StreamId): Message = Message(s, "hello")
 
     val stream0: StreamId = streamId("a:")
     val stream1: StreamId = streamId("a:b")
@@ -55,15 +55,15 @@ object BrokerSuite extends SimpleIOSuite:
 
     extension (b: Broker[IO])
       def publishAll: IO[Unit] =
-        b.publish(NonEmptySet.of(stream0), msg) >>
-          b.publish(NonEmptySet.of(stream1), msg) >>
-          b.publish(NonEmptySet.of(stream2), msg) >>
-          b.publish(NonEmptySet.of(stream3), msg) >>
-          b.publish(NonEmptySet.of(stream4), msg) >>
-          b.publish(NonEmptySet.of(stream5), msg) >>
-          b.publish(NonEmptySet.of(stream6), msg)
+        b.publish(msg(stream0)) >>
+          b.publish(msg(stream1)) >>
+          b.publish(msg(stream2)) >>
+          b.publish(msg(stream3)) >>
+          b.publish(msg(stream4)) >>
+          b.publish(msg(stream5)) >>
+          b.publish(msg(stream6))
 
-      def subToAll: IO[List[Stream[IO, (StreamId, (StreamId, Message))]]] =
+      def subToAll: IO[List[Stream[IO, (StreamId, Message)]]] =
         List(
           b.subscribeWithoutPulling(NonEmptySet.of(stream0), q100).map(_.map((stream0, _))),
           b.subscribeWithoutPulling(NonEmptySet.of(stream1), q100).map(_.map((stream1, _))),
@@ -74,26 +74,26 @@ object BrokerSuite extends SimpleIOSuite:
           b.subscribeWithoutPulling(NonEmptySet.of(stream6), q100).map(_.map((stream6, _)))
         ).sequence
 
-    extension (l: List[Stream[IO, (StreamId, (StreamId, Message))]])
+    extension (l: List[Stream[IO, (StreamId, Message)]])
       /** Outputs a map with structure Map[subscribed stream id, Map[published stream id, message]]
         */
-      def collectAll(take: Int, timeout: FiniteDuration): IO[Map[StreamId, Map[StreamId, Message]]] =
+      def collectAll(take: Int, timeout: FiniteDuration): IO[Map[StreamId, List[Message]]] =
         Stream.iterable(l)
           .parJoinUnbounded
           .take(take)
           .timeout(timeout)
           .compile
           .toList
-          .map(_.groupBy(_._1).fmap(_.map(_._2).toMap))
+          .map(_.groupBy(_._1).fmap(_.map(_._2)))
 
-    val expectation: Map[StreamId, Map[StreamId, Message]] = Map(
-      stream0 -> Map(stream0 -> msg, stream1 -> msg, stream2 -> msg, stream3 -> msg, stream4 -> msg),
-      stream1 -> Map(stream0 -> msg, stream1 -> msg, stream2 -> msg, stream3 -> msg, stream4 -> msg),
-      stream2 -> Map(stream0 -> msg, stream1 -> msg, stream2 -> msg, stream3 -> msg),
-      stream3 -> Map(stream0 -> msg, stream1 -> msg, stream2 -> msg, stream3 -> msg),
-      stream4 -> Map(stream0 -> msg, stream1 -> msg, stream4 -> msg),
-      stream5 -> Map(stream5 -> msg),
-      stream6 -> Map(stream6 -> msg)
+    val expectation: Map[StreamId, List[Message]] = Map(
+      stream0 -> List(msg(stream0), msg(stream1), msg(stream2), msg(stream3), msg(stream4)),
+      stream1 -> List(msg(stream0), msg(stream1), msg(stream2), msg(stream3), msg(stream4)),
+      stream2 -> List(msg(stream0), msg(stream1), msg(stream2), msg(stream3)),
+      stream3 -> List(msg(stream0), msg(stream1), msg(stream2), msg(stream3)),
+      stream4 -> List(msg(stream0), msg(stream1), msg(stream4)),
+      stream5 -> List(msg(stream5)),
+      stream6 -> List(msg(stream6))
     )
 
     val messageCount: Int =
@@ -126,7 +126,7 @@ object BrokerSuite extends SimpleIOSuite:
   )(routingTest(1))
 
   test("publish and subscribe to multiple stream ids works like single ones"):
-    val msg: Message = Message(s"Hello")
+    def msg(s: StreamId): Message = Message(s, s"Hello")
 
     val stream0: StreamId = streamId("a:")
     val stream1: StreamId = streamId("a:b")
@@ -136,11 +136,11 @@ object BrokerSuite extends SimpleIOSuite:
     for
       b  <- Broker[IO](100)
       s  <- b.subscribeWithoutPulling(NonEmptySet.of(stream1, stream2, stream3), q100)
-      _  <- b.publish(NonEmptySet.of(stream0), msg)
+      _  <- b.publish(msg(stream0))
       o1 <- s.take(3).map(_._1).compile.toList
 
       s1 <- b.subscribeWithoutPulling(NonEmptySet.of(stream0), q100)
-      _  <- b.publish(NonEmptySet.of(stream1, stream2, stream3), msg)
+      _  <- b.publish(List(stream1, stream2, stream3).map(msg))
       o2 <- s1.take(3).map(_._1).compile.toList
     yield expect.all(
       o1.sortBy(_.string) == List.fill(3)(stream0),
@@ -148,20 +148,20 @@ object BrokerSuite extends SimpleIOSuite:
     )
 
   test("overflown subscriber queues drop old messages"):
-    def msg(i: Int): Message =
-      Message(s"Hello: $i")
+    def msg(s: StreamId, i: Int): Message =
+      Message(s, s"Hello: $i")
 
     val stream: StreamId = streamId("a:")
 
     extension (b: Broker[IO])
       def publish10: IO[Unit] =
-        List.range(0, 10).map(i => b.publish(NonEmptySet.of(stream), msg(i))).sequence_
+        List.range(0, 10).map(i => b.publish(msg(stream, i))).sequence_
 
-      def suscribeNoPull(maxQueued: MaxQueued): IO[Stream[IO, (StreamId, Message)]] =
+      def suscribeNoPull(maxQueued: MaxQueued): IO[Stream[IO, Message]] =
         b.subscribeWithoutPulling(NonEmptySet.of(stream), maxQueued)
 
-    extension (st: Stream[IO, (StreamId, Message)])
-      def collectAll(take: Int, timeout: FiniteDuration): IO[List[(StreamId, Message)]] =
+    extension (st: Stream[IO, Message])
+      def collectAll(take: Int, timeout: FiniteDuration): IO[List[Message]] =
         st.take(take)
           .timeout(timeout)
           .compile
@@ -172,7 +172,7 @@ object BrokerSuite extends SimpleIOSuite:
       s <- b.suscribeNoPull(MaxQueued(1))
       _ <- b.publish10
       o <- s.collectAll(1, 1.second)
-    yield expect(o == List(stream -> msg(9)))
+    yield expect(o == List(msg(stream, 9)))
 
   test("publishStream routes to timely subscribers"):
     val stream0: StreamId = streamId("a:")
@@ -180,23 +180,23 @@ object BrokerSuite extends SimpleIOSuite:
     val stream2: StreamId = streamId("a:c")
     val stream3: StreamId = streamId("a:d")
 
-    def msg(i: Int): Message =
-      Message(s"Hello: $i")
+    def msg(s: StreamId, i: Int): Message =
+      Message(s, s"Hello: $i")
 
-    val messages: Stream[IO, Message] =
-      Stream.eval(IO.sleep(100.millis) as msg(1)) ++
-        Stream.eval(IO.sleep(100.millis) as msg(2)) ++
-        Stream.eval(IO.sleep(100.millis) as msg(3))
+    def messages(s: StreamId): Stream[IO, Message] =
+      Stream.eval(IO.sleep(100.millis) as msg(s, 1)) ++
+        Stream.eval(IO.sleep(100.millis) as msg(s, 2)) ++
+        Stream.eval(IO.sleep(100.millis) as msg(s, 3))
 
     extension (b: Broker[IO])
       def publishAll: IO[Unit] =
-        messages.evalTap(b.publish(NonEmptySet.of(stream0), _)).compile.drain
+        messages(stream0).evalTap(b.publish).compile.drain
 
-      def suscribeNoPull(stream: StreamId): IO[Stream[IO, (StreamId, Message)]] =
+      def suscribeNoPull(stream: StreamId): IO[Stream[IO, Message]] =
         b.subscribeWithoutPulling(NonEmptySet.of(stream), q100)
 
-    extension (st: Stream[IO, (StreamId, Message)])
-      def toList(take: Int, timeout: FiniteDuration): IO[List[(StreamId, Message)]] =
+    extension (st: Stream[IO, Message])
+      def toList(take: Int, timeout: FiniteDuration): IO[List[Message]] =
         st.take(take).timeout(timeout).compile.toList
 
     for
@@ -217,8 +217,8 @@ object BrokerSuite extends SimpleIOSuite:
       o3 <- s3.toList(1, 100.millis)
       o4 <- s4.toList(1, 100.millis).recover { case _: TimeoutException => Nil }
     yield expect.all(
-      o1 == List(msg(1), msg(2), msg(3)).map((stream0, _)),
-      o2 == List(msg(2), msg(3)).map((stream0, _)),
-      o3 == List(msg(3)).map((stream0, _)),
+      o1 == List(msg(stream0, 1), msg(stream0, 2), msg(stream0, 3)),
+      o2 == List(msg(stream0, 2), msg(stream0, 3)),
+      o3 == List(msg(stream0, 3)),
       o4 == Nil
     )

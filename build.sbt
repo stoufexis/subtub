@@ -27,9 +27,10 @@ lazy val http: Seq[ModuleID] =
 
 lazy val effect: Seq[ModuleID] =
   Seq(
-    "co.fs2"        %% "fs2-core"    % "3.11.0",
-    "org.typelevel" %% "cats-effect" % "3.5.7",
-    "org.typelevel" %% "cats-core"   % "2.12.0"
+    "co.fs2"        %% "fs2-core"       % "3.11.0",
+    "org.typelevel" %% "cats-effect"    % "3.5.7",
+    "org.typelevel" %% "cats-core"      % "2.12.0",
+    "org.typelevel" %% "alleycats-core" % "2.12.0"
   )
 
 lazy val serdes: Seq[ModuleID] =
@@ -59,5 +60,5 @@ lazy val root = (project in file("."))
     scalacOptions ++= compileFlags,
     libraryDependencies ++= http ++ effect ++ serdes ++ log ++ test,
     // docker
-    dockerBaseImage := "openjdk:11",
+    dockerBaseImage := "openjdk:11"
   )
