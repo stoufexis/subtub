@@ -8,6 +8,7 @@ import fs2.*
 import org.typelevel.log4cats.Logger
 
 import com.stoufexis.subtub.model.*
+import com.stoufexis.subtub.util.*
 
 trait Broker[F[_]]:
   def publish(messages: List[Message]): F[Unit]
@@ -24,15 +25,14 @@ object Broker:
   def apply[F[_]](shardCount: Int)(using F: Concurrent[F], T: Unique[F], log: Logger[F]): F[Broker[F]] =
     for state <- BrokerState[F](shardCount) yield new:
       override def publish(messages: List[Message]): F[Unit] =
-        import alleycats.std.iterable.given
+        messages.foldLeftM_(Map.empty[StreamId, Chain[Subscriber[F]]]): (cache, msg) =>
+          cache.get(msg.publish_to) match
+            case Some(subs) =>
+              subs.traverse(_.offer(msg)) as cache
 
-        val groupped: Iterable[(StreamId, List[Message])] =
-          messages.groupBy(_.publish_to)
-
-        groupped.traverse_ : (key, messages) =>
-          state
-            .get(key)
-            .flatMap(_.traverse_(q => messages.traverse_(q.offer)))
+            case None =>
+              state.get(msg.publish_to).flatMap: subs =>
+                subs.traverse_(_.offer(msg)) as cache.updated(msg.publish_to, subs)
 
       override def subscribeDeferred(
         keys:      NonEmptySet[StreamId],
