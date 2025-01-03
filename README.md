@@ -18,7 +18,7 @@ docker run -p 8080:80 \
 
 The server exposes two endpoints:
 * `GET /subscribe?max_queued={MAX_QUEUED}&streams={STREAM_ID_1}&streams={STREAM_ID_2}&streams={STREAM_ID_3}&...` subscribes to the provided streams and initiates a websocket connection, emiting all published messages matching the streams.
-* `POST /publish` publishes a batch of messages. The should be placed in the request body, which is expected to have the following structure:
+* `POST /publish` publishes a batch of messages. The messages should be placed in the request body, which is expected to have the following structure:
 ```json
 [
   { "publish_to": "{STREAM_ID_1}",  "payload": "{PAYLOAD_1}" },
